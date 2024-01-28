@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 8726532718879823241}
   - component: {fileID: 5142873173970930718}
+  - component: {fileID: 1318118965267159803}
   m_Layer: 0
   m_Name: Path Up-Down
   m_TagString: Untagged
@@ -85,6 +86,22 @@ SpriteRenderer:
   m_WasSpriteAssigned: 1
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
+--- !u!114 &1318118965267159803
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5654411457925084246}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3dd93be1df2a9954dadfa5c84c7eb644, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  socketUp: 1
+  socketDown: 1
+  socketLeft: 0
+  socketRight: 0
 --- !u!1 &8945083174524541009
 GameObject:
   m_ObjectHideFlags: 0
