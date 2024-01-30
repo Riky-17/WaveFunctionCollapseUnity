@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Diagnostics;
 using UnityEngine;
 
 public class WFC : MonoBehaviour
@@ -14,7 +15,11 @@ public class WFC : MonoBehaviour
 
     void Start()
     {
+        Stopwatch sw = new Stopwatch();
+        sw.Start();
         StartWaveFunctionCollapse();
+        sw.Stop();
+        UnityEngine.Debug.Log(sw.Elapsed);
     }
 
     void StartWaveFunctionCollapse()
@@ -22,8 +27,8 @@ public class WFC : MonoBehaviour
         List<Node> nodesToCollapse = gridWFC.ConvertArrayToList();
         Node currentNode = null;
         int[] currentNodeSockets;
-        List<Node> neighbours;
         List<TileWFC> neighbourTiles;
+        List<TileWFC> neighbourTilesCopy;
 
         while(nodesToCollapse.Count > 0)
         {
@@ -48,7 +53,10 @@ public class WFC : MonoBehaviour
             collapsedNodes.Add(currentNode);
 
             if(nodesToCollapse.Count <= 0)
+            {
+                Instantiate(currentNode.nodeTile, currentNode.nodePos, Quaternion.identity);
                 break;
+            }
 
             //get the sockets of the current node
             currentNodeSockets = currentNode.nodeTile.sockets;
@@ -61,10 +69,11 @@ public class WFC : MonoBehaviour
 
                 int neighbourSocketIndex = i + 2 < currentNodeSockets.Length ? i + 2 : i - 2;
                 neighbourTiles = neighbour.possibleTiles;
+                neighbourTilesCopy = new(neighbourTiles);
 
-                for (int n = 0; n < neighbourTiles.Count; n++)
+                for (int n = 0; n < neighbourTilesCopy.Count; n++)
                 {
-                    TileWFC tile = neighbourTiles[n];
+                    TileWFC tile = neighbourTilesCopy[n];
                     if (currentNode.nodeTile.sockets[i] != tile.sockets[neighbourSocketIndex])
                         neighbourTiles.Remove(tile);
                 }
