@@ -97,3 +97,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3dd93be1df2a9954dadfa5c84c7eb644, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  sockets: 00000000000000000000000000000000

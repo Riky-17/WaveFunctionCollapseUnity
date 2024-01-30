@@ -4,7 +4,10 @@ using UnityEngine;
 
 public class Node
 {
-    List<TileWFC> tiles;
+    public List<TileWFC> possibleTiles;
+    public int entropy => possibleTiles.Count;
+    public TileWFC nodeTile;
+    public bool isCollapsed => nodeTile != null;
     public Vector2 nodePos;
     public int x;
     public int y;
@@ -12,7 +15,7 @@ public class Node
     public Node(Vector2 pos, IEnumerable<TileWFC> tiles, int x, int y)
     {
         nodePos = pos;
-        this.tiles = new(tiles);
+        possibleTiles = new(tiles);
         this.x = x;
         this.y = y;
     }

@@ -4,8 +4,6 @@ using UnityEngine;
 
 public class TileWFC : MonoBehaviour
 {
-    public int socketUp;
-    public int socketDown;
-    public int socketLeft;
-    public int socketRight;
+    //the values for the four sookets/sides of the tile starting from up and going clock-wise
+    public int[] sockets;
 }

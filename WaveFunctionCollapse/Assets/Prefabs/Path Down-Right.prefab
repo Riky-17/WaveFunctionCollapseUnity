@@ -268,10 +268,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3dd93be1df2a9954dadfa5c84c7eb644, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  socketUp: 0
-  socketDown: 1
-  socketLeft: 0
-  socketRight: 2
+  sockets: 00000000010000000100000000000000
 --- !u!1 &4532646117562444911
 GameObject:
   m_ObjectHideFlags: 0
