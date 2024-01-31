@@ -8,8 +8,8 @@ public class GridWFC : MonoBehaviour
 
     float nodeRadius = .5f;
     float nodeDiameter => nodeRadius * 2;
-    float gridSizeX = 20f;
-    float gridSizeY = 20f;
+    float gridSizeX = 200f;
+    float gridSizeY = 200f;
     public int nodesAmountX => Mathf.RoundToInt(gridSizeX / nodeDiameter);
     public int nodesAmountY => Mathf.RoundToInt(gridSizeY / nodeDiameter);
     public Node[,] grid {get; private set;}
@@ -78,42 +78,11 @@ public class GridWFC : MonoBehaviour
         }
     }
 
-    public List<Node> getNeighbours(Node node)
-    {
-        List<Node> neighbours = new();
-        for (int x = - 1; x < 2; x += 2)
-        {
-            int neighbourX = node.x + x;
-            if(neighbourX < 0 || neighbourX >= nodesAmountX)
-                continue;
-            
-            Node neighbourNode = grid[neighbourX, node.y];
-            if(neighbourNode.isCollapsed)
-                continue;
-
-            neighbours.Add(neighbourNode);
-        }
-
-        for (int y = - 1; y < 2; y += 2)
-        {
-            int neighbourY = node.y + y;
-            if(neighbourY < 0 || neighbourY >= nodesAmountY)
-                continue;
-
-            Node neighbourNode = grid[node.x, neighbourY];
-            if(neighbourNode.isCollapsed)
-                continue;
-            
-            neighbours.Add(neighbourNode);
-        }
-        return neighbours;
-    }
-
-    public List<Node> ConvertArrayToList()
+    public Heap<Node> ConvertArrayToHeap()
     {
         int width = grid.GetLength(0);
         int height = grid.GetLength(1);
-        List<Node> nodes = new();
+        Heap<Node> nodes = new(width * height);
         for (int x = 0; x < width; x++)
         {
             for (int y = 0; y < height; y++)
@@ -123,12 +92,4 @@ public class GridWFC : MonoBehaviour
         }
         return nodes;
     }
-
-    // bool IsNodeOnEdge(Node node)
-    // {
-    //     if(node.x == 0 || node.y == 0 || node.x == nodesAmountX - 1 || node.y == nodesAmountY - 1)
-    //         return true;
-
-    //     return false;
-    // }
 }

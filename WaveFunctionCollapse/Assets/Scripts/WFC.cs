@@ -1,58 +1,38 @@
 using System.Collections.Generic;
-using System.Diagnostics;
 using UnityEngine;
 
 public class WFC : MonoBehaviour
 {
     GridWFC gridWFC;
-    HashSet<Node> collapsedNodes = new();
+    Heap<Node> nodesToCollapse;
+    int[] currentNodeSockets;
+    List<TileWFC> neighbourTiles;
+    List<TileWFC> neighbourTilesCopy;
 
     void Awake()
     {
         gridWFC = GetComponent<GridWFC>();
         gridWFC.CreateGrid();
+        nodesToCollapse = gridWFC.ConvertArrayToHeap();
     }
 
     void Start()
     {
-        Stopwatch sw = new Stopwatch();
-        sw.Start();
         StartWaveFunctionCollapse();
-        sw.Stop();
-        UnityEngine.Debug.Log(sw.Elapsed);
     }
 
     void StartWaveFunctionCollapse()
     {
-        List<Node> nodesToCollapse = gridWFC.ConvertArrayToList();
-        Node currentNode = null;
-        int[] currentNodeSockets;
-        List<TileWFC> neighbourTiles;
-        List<TileWFC> neighbourTilesCopy;
+        Node currentNode;
 
-        while(nodesToCollapse.Count > 0)
+        while(nodesToCollapse.HeapSize > 0)
         {
-            if (currentNode == null)
-            {
-                currentNode = nodesToCollapse[Random.Range(0, nodesToCollapse.Count)];
-            }
-            else
-            {
-                int entropy = 20;
-                foreach (Node node in nodesToCollapse)
-                {
-                    if(node.entropy < entropy)
-                        currentNode = node;
-                }
-            }
-
+            currentNode = nodesToCollapse.RemoveFirst();
             //set the tile of the current node
-            currentNode.nodeTile = currentNode.possibleTiles[Random.Range(0, currentNode.possibleTiles.Count)];
+            int index = Random.Range(0, currentNode.possibleTiles.Count);
+            currentNode.nodeTile = currentNode.possibleTiles[index];
 
-            nodesToCollapse.Remove(currentNode);
-            collapsedNodes.Add(currentNode);
-
-            if(nodesToCollapse.Count <= 0)
+            if(nodesToCollapse.HeapSize <= 0)
             {
                 Instantiate(currentNode.nodeTile, currentNode.nodePos, Quaternion.identity);
                 break;
@@ -61,12 +41,11 @@ public class WFC : MonoBehaviour
             //get the sockets of the current node
             currentNodeSockets = currentNode.nodeTile.sockets;
             //lower the entropy of neighbour nodes
-            //neighbours = gridWFC.getNeighbours(currentNode);
             for (int i = 0; i < currentNodeSockets.Length; i++)
             {
-                if(!gridWFC.TryGetNeighborFromDirection(i, currentNode, out Node neighbour))
+                if(!gridWFC.TryGetNeighborFromDirection(i, currentNode, out Node neighbour) || neighbour.isCollapsed)
                     continue;
-
+                //get the socket of the neighbour that is facing the oppist was from the on of the current node
                 int neighbourSocketIndex = i + 2 < currentNodeSockets.Length ? i + 2 : i - 2;
                 neighbourTiles = neighbour.possibleTiles;
                 neighbourTilesCopy = new(neighbourTiles);
@@ -76,13 +55,13 @@ public class WFC : MonoBehaviour
                     TileWFC tile = neighbourTilesCopy[n];
                     if (currentNode.nodeTile.sockets[i] != tile.sockets[neighbourSocketIndex])
                         neighbourTiles.Remove(tile);
+
+                    if(neighbourTilesCopy != neighbourTiles)
+                        nodesToCollapse.SortUp(neighbour);
                 }
             }
 
-            Instantiate(currentNode.nodeTile, currentNode.nodePos, Quaternion.identity);
-            
+            Instantiate(currentNode.nodeTile, currentNode.nodePos, Quaternion.identity);   
         }
     }
-
-    
 }
