@@ -29,8 +29,8 @@ public class WFC : MonoBehaviour
         {
             currentNode = nodesToCollapse.RemoveFirst();
             //set the tile of the current node
-            int index = Random.Range(0, currentNode.possibleTiles.Count);
-            currentNode.nodeTile = currentNode.possibleTiles[index];
+            int tileIndex = currentNode.possibleTiles.Count > 1 ? Random.Range(0, currentNode.possibleTiles.Count) : 0;
+            currentNode.nodeTile = currentNode.possibleTiles[tileIndex];
 
             if(nodesToCollapse.HeapSize <= 0)
             {

@@ -224,8 +224,8 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1491416567}
-  - component: {fileID: 1491416566}
   - component: {fileID: 1491416568}
+  - component: {fileID: 1491416569}
   m_Layer: 0
   m_Name: WFC
   m_TagString: Untagged
@@ -233,27 +233,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1491416566
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1491416565}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ed1abea5b45c27745866b1fe43eb0638, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  tiles:
-  - {fileID: 6671036014390761816, guid: 90190595ed027a44b853cd38e6c3cc75, type: 3}
-  - {fileID: 2497027589728638779, guid: 183aa82a4b8f0f54193cf22a3b921f26, type: 3}
-  - {fileID: 8166864392562677671, guid: 601473bb58d035843b9a3a4c4f76413b, type: 3}
-  - {fileID: -2767315125474948018, guid: 55e062c2767ce2949b2da10c92057b07, type: 3}
-  - {fileID: 4211351655904945093, guid: c2caa2a672b96f2478a5ac3a08c0be8c, type: 3}
-  - {fileID: 1318118965267159803, guid: df44bcb3d188ae4478ea729c99a31c46, type: 3}
-  - {fileID: 5965711568292230925, guid: 7dd40ff91675d05409b3ea35dd3118fa, type: 3}
-  - {fileID: -6416047158076657984, guid: 9112bc1924b2af44bac61b66f4b6e7c5, type: 3}
 --- !u!4 &1491416567
 Transform:
   m_ObjectHideFlags: 0
@@ -281,6 +260,27 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 303f4e8e21241ec488a966a56e3d95bb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!114 &1491416569
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1491416565}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ed1abea5b45c27745866b1fe43eb0638, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  tiles:
+  - {fileID: 6671036014390761816, guid: 90190595ed027a44b853cd38e6c3cc75, type: 3}
+  - {fileID: 2497027589728638779, guid: 183aa82a4b8f0f54193cf22a3b921f26, type: 3}
+  - {fileID: 8166864392562677671, guid: 601473bb58d035843b9a3a4c4f76413b, type: 3}
+  - {fileID: -2767315125474948018, guid: 55e062c2767ce2949b2da10c92057b07, type: 3}
+  - {fileID: 4211351655904945093, guid: c2caa2a672b96f2478a5ac3a08c0be8c, type: 3}
+  - {fileID: 1318118965267159803, guid: df44bcb3d188ae4478ea729c99a31c46, type: 3}
+  - {fileID: 5965711568292230925, guid: 7dd40ff91675d05409b3ea35dd3118fa, type: 3}
+  - {fileID: -6416047158076657984, guid: 9112bc1924b2af44bac61b66f4b6e7c5, type: 3}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

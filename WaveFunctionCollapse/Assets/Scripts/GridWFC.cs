@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -37,44 +36,44 @@ public class GridWFC : MonoBehaviour
         switch (socketDir)
         {
             case 0:
-            int up = currenNode.y + 1;
-            if(up >= nodesAmountY)
-            {
-                neighbour = null;
-                return false;
-            }
-            neighbour = grid[currenNode.x, up];
-            return true;
+                int up = currenNode.y + 1;
+                if(up >= nodesAmountY)
+                {
+                    neighbour = null;
+                    return false;
+                }
+                neighbour = grid[currenNode.x, up];
+                return true;
             case 1:
-            int right = currenNode.x + 1;
-            if (right >= nodesAmountX)
-            {
-                neighbour = null;
-                return false;
-            }
-            neighbour = grid[right, currenNode.y];
-            return true;
+                int right = currenNode.x + 1;
+                if (right >= nodesAmountX)
+                {
+                    neighbour = null;
+                    return false;
+                }
+                neighbour = grid[right, currenNode.y];
+                return true;
             case 2:
-            int down = currenNode.y - 1;
-            if(down < 0)
-            {
-                neighbour = null;
-                return false;
-            }
-            neighbour = grid[currenNode.x, down];
-            return true;
+                int down = currenNode.y - 1;
+                if(down < 0)
+                {
+                    neighbour = null;
+                    return false;
+                }
+                neighbour = grid[currenNode.x, down];
+                return true;
             case 3:
-            int left = currenNode.x - 1;
-            if (left < 0)
-            {
+                int left = currenNode.x - 1;
+                if (left < 0)
+                {
+                    neighbour = null;
+                    return false;
+                }
+                neighbour = grid[left, currenNode.y];
+                return true;
+            default:
                 neighbour = null;
                 return false;
-            }
-            neighbour = grid[left, currenNode.y];
-            return true;
-            default:
-            neighbour = null;
-            return false;
         }
     }
 
