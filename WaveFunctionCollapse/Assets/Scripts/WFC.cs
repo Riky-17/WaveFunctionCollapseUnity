@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using System.Collections;
 
 public class WFC : MonoBehaviour
 {
@@ -19,6 +20,7 @@ public class WFC : MonoBehaviour
     void Start()
     {
         StartWaveFunctionCollapse();
+        //StartCoroutine(nameof(StartWaveFunctionCollapse));
     }
 
     void StartWaveFunctionCollapse()
@@ -29,6 +31,8 @@ public class WFC : MonoBehaviour
         {
             currentNode = nodesToCollapse.RemoveFirst();
             //set the tile of the current node
+            Debug.Log(currentNode.possibleTiles.Count);
+            Debug.Log(currentNode.nodePos);
             int tileIndex = currentNode.possibleTiles.Count > 1 ? Random.Range(0, currentNode.possibleTiles.Count) : 0;
             currentNode.nodeTile = currentNode.possibleTiles[tileIndex];
 
@@ -61,7 +65,8 @@ public class WFC : MonoBehaviour
                 }
             }
 
-            Instantiate(currentNode.nodeTile, currentNode.nodePos, Quaternion.identity);   
+            Instantiate(currentNode.nodeTile, currentNode.nodePos, Quaternion.identity);
+            //yield return null;
         }
     }
 }

@@ -31,7 +31,7 @@ public class GridWFC : MonoBehaviour
                 {
                     for (int i = 0; i < 4; i++)
                     {
-                        if(!TryGetNeighborFromDirection(i, node, out Node neighbour))
+                        if (!TryGetNeighborFromDirection(i, node, out _))
                         {
                             foreach (TileWFC tile in tiles)
                             {
