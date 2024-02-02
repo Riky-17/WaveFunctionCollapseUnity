@@ -26,6 +26,21 @@ public class GridWFC : MonoBehaviour
                 float yPos = nodeRadius + nodeDiameter * y;
                 Vector2 nodePos = new Vector2(xPos, yPos) + bottomLeft;
                 Node node = new(nodePos, tiles, x, y);
+
+                if(x == 0 || x == nodesAmountX - 1 || y == 0 || y == nodesAmountY - 1)
+                {
+                    for (int i = 0; i < 4; i++)
+                    {
+                        if(!TryGetNeighborFromDirection(i, node, out Node neighbour))
+                        {
+                            foreach (TileWFC tile in tiles)
+                            {
+                                if(tile.sockets[i] > 0)
+                                node.possibleTiles.Remove(tile);
+                            }
+                        }
+                    }
+                }
                 grid[x, y] = node;
             }
         }
