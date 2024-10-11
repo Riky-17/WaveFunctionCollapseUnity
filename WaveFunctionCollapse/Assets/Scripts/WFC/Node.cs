@@ -4,9 +4,9 @@ using UnityEngine;
 public class Node : IHeapItem<Node>
 {
     public List<TileWFC> possibleTiles;
-    public int entropy => possibleTiles.Count;
+    public int Entropy => possibleTiles.Count;
     public TileWFC nodeTile;
-    public bool isCollapsed => nodeTile != null;
+    public bool IsCollapsed => nodeTile != null;
     int heapIndex;
     public Vector2 nodePos;
     public int x;
@@ -20,11 +20,11 @@ public class Node : IHeapItem<Node>
         this.y = y;
     }
 
-    public int HeapIndex {get => heapIndex; set => heapIndex = value;}
+    public int HeapIndex { get => heapIndex; set => heapIndex = value; }
 
     public int CompareTo(Node other)
     {
-        int compare = entropy.CompareTo(other.entropy);
+        int compare = Entropy.CompareTo(other.Entropy);
         return -compare;
     }
 }

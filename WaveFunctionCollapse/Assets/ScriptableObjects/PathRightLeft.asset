@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3dd93be1df2a9954dadfa5c84c7eb644, type: 3}
+  m_Name: PathRightLeft
+  m_EditorClassIdentifier: 
+  Object: {fileID: 1352994825017477606, guid: 55e062c2767ce2949b2da10c92057b07, type: 3}
+  upSocket: 0
+  rightSocket: 1
+  downSocket: 0
+  leftSocket: 1
