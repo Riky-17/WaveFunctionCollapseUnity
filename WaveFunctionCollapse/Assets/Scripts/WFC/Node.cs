@@ -5,6 +5,7 @@ public class Node : IHeapItem<Node>
 {
     public List<TileWFC> possibleTiles;
     public int Entropy => possibleTiles.Count;
+    public int collapsedNeighbours;
     public TileWFC nodeTile;
     public bool IsCollapsed => nodeTile != null;
     int heapIndex;
@@ -33,6 +34,8 @@ public class Node : IHeapItem<Node>
     public int CompareTo(Node other)
     {
         int compare = Entropy.CompareTo(other.Entropy);
+        if(compare == 0)
+            return collapsedNeighbours.CompareTo(other.collapsedNeighbours);
         return -compare;
     }
 }

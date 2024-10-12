@@ -19,13 +19,9 @@ public class WFC : MonoBehaviour
 
     public void WaveFunctionCollapse()
     {
-        float timer;
-        timer = Time.time;
         CreateGrid();
         ConvertArrayToHeap();
         StartWaveFunctionCollapse();
-        timer -= Time.time;
-        Debug.Log(timer);
     }
 
     void CreateGrid()
@@ -53,6 +49,7 @@ public class WFC : MonoBehaviour
                                 if(tile.GetSocket(i) > 0)
                                 node.possibleTiles.Remove(tile);
                             }
+                            node.collapsedNeighbours++;
                         }
                     }
                 }
@@ -127,14 +124,18 @@ public class WFC : MonoBehaviour
         while(nodesToCollapse.HeapSize > 0)
         {
             currentNode = nodesToCollapse.RemoveFirst();
-            if(currentNode.Entropy == 0)
-                Debug.Log(currentNode.nodePos);
 
             //set the tile of the current node
             int tileIndex = currentNode.possibleTiles.Count > 1 ? Random.Range(0, currentNode.possibleTiles.Count) : 0;
             currentNode.nodeTile = currentNode.possibleTiles[tileIndex];
             currentNode.ReduceEntropy();
             Instantiate(currentNode.nodeTile.Object, currentNode.nodePos, Quaternion.identity, transform);
+            
+            for (int i = 0; i < 4; i++)
+            {
+                if(TryGetNeighborFromDirection(i, currentNode, out Node neighbour))
+                    neighbour.collapsedNeighbours++;
+            }
 
             if(nodesToCollapse.HeapSize <= 0)
                 break;

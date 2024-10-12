@@ -55,17 +55,12 @@ public class Heap<T> where T : IHeapItem<T>
                 if(childRightIndex < HeapSize)
                 {
                     if(heap[childLeftIndex].CompareTo(heap[childRightIndex]) < 0)
-                    {
                         swapIndex = childRightIndex;
-                    }
                 }
                 if(item.CompareTo(heap[swapIndex]) < 0)
-                {
                     Swap(item, heap[swapIndex]);
-                }
                 else
                     break;
-
             }
             else
                 break;
