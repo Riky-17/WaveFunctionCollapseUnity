@@ -20,6 +20,14 @@ public class Node : IHeapItem<Node>
         this.y = y;
     }
 
+    public void ReduceEntropy()
+    {
+        List<TileWFC> possibleTilesDup = new(possibleTiles);
+        foreach (TileWFC tile in possibleTilesDup)
+            if(tile != nodeTile)
+                possibleTiles.Remove(tile);
+    }
+
     public int HeapIndex { get => heapIndex; set => heapIndex = value; }
 
     public int CompareTo(Node other)

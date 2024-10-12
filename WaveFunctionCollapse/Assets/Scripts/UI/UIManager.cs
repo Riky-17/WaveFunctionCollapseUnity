@@ -38,6 +38,6 @@ public class UIManager : MonoBehaviour
     {
         xSizeText.text = "X Size: " + wfc.gridSizeX;
         ySizeText.text = "Y Size: " + wfc.gridSizeY;
-        tilesAmountText.text = "Tiles Amount: " + (wfc.NodesAmountX + wfc.NodesAmountY);
+        tilesAmountText.text = "Tiles Amount: " + (wfc.NodesAmountX * wfc.NodesAmountY);
     }
 }

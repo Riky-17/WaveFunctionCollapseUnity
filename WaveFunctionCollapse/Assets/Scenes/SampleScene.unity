@@ -470,7 +470,7 @@ MonoBehaviour:
   m_Direction: 0
   m_MinValue: 20
   m_MaxValue: 200
-  m_WholeNumbers: 0
+  m_WholeNumbers: 1
   m_Value: 125
   m_OnValueChanged:
     m_PersistentCalls:
@@ -1256,7 +1256,7 @@ MonoBehaviour:
   m_Direction: 0
   m_MinValue: 20
   m_MaxValue: 200
-  m_WholeNumbers: 0
+  m_WholeNumbers: 1
   m_Value: 125
   m_OnValueChanged:
     m_PersistentCalls:
@@ -1627,8 +1627,8 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 69c90e0d8130fdc44ac127c9c4d23798, type: 2}
   - {fileID: 11400000, guid: 72760ceac3c87514390ccf5d7ba36336, type: 2}
   - {fileID: 11400000, guid: 1b134f636a837c2469fc6ebd8839436b, type: 2}
-  gridSizeX: 50
-  gridSizeY: 50
+  gridSizeX: 184
+  gridSizeY: 189
 --- !u!1 &1793021055
 GameObject:
   m_ObjectHideFlags: 0
@@ -2025,7 +2025,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1993613254}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 1491416568}
+        m_TargetAssemblyTypeName: WFC, Assembly-CSharp
+        m_MethodName: WaveFunctionCollapse
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &1993613254
 MonoBehaviour:
   m_ObjectHideFlags: 0

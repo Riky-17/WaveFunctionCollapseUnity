@@ -15,14 +15,17 @@ public class WFC : MonoBehaviour
     Node[,] grid;
 
     Heap<Node> nodesToCollapse;
-    List<TileWFC> neighbourTiles;
-    Queue<Node> collapsedNeighbours = new();
+    readonly Stack<Node> nodesStack = new();
 
     public void WaveFunctionCollapse()
     {
+        float timer;
+        timer = Time.time;
         CreateGrid();
         ConvertArrayToHeap();
         StartWaveFunctionCollapse();
+        timer -= Time.time;
+        Debug.Log(timer);
     }
 
     void CreateGrid()
@@ -113,8 +116,7 @@ public class WFC : MonoBehaviour
                 neighbour = grid[left, currentNode.y];
                 return true;
             default:
-                neighbour = null;
-                return false;
+                throw new System.ArgumentOutOfRangeException();
         }
     }
 
@@ -125,86 +127,60 @@ public class WFC : MonoBehaviour
         while(nodesToCollapse.HeapSize > 0)
         {
             currentNode = nodesToCollapse.RemoveFirst();
+            if(currentNode.Entropy == 0)
+                Debug.Log(currentNode.nodePos);
 
             //set the tile of the current node
             int tileIndex = currentNode.possibleTiles.Count > 1 ? Random.Range(0, currentNode.possibleTiles.Count) : 0;
             currentNode.nodeTile = currentNode.possibleTiles[tileIndex];
+            currentNode.ReduceEntropy();
+            Instantiate(currentNode.nodeTile.Object, currentNode.nodePos, Quaternion.identity, transform);
 
             if(nodesToCollapse.HeapSize <= 0)
-            {
-                Instantiate(currentNode.nodeTile.Object, currentNode.nodePos, Quaternion.identity, transform);
                 break;
-            }
 
-            //lower the entropy of neighbour nodes
-            for (int i = 0; i < 4; i++)
-            {
-                if(!TryGetNeighborFromDirection(i, currentNode, out Node neighbour) || neighbour.IsCollapsed)
-                    continue;
-                //get the socket of the neighbour that is facing the opposite was from the on of the current node
-                int neighbourSocketIndex = GetOppositeSide(i);
-                neighbourTiles = new(neighbour.possibleTiles);
-
-                for (int n = 0; n < neighbourTiles.Count; n++)
-                {
-                    TileWFC tile = neighbourTiles[n];
-                    if (currentNode.nodeTile.GetSocket(i) != tile.GetSocket(neighbourSocketIndex))
-                        neighbour.possibleTiles.Remove(tile);
-
-                    if(neighbour.possibleTiles.Count != neighbourTiles.Count)
-                    {
-                        nodesToCollapse.SortUp(neighbour);
-                        collapsedNeighbours.Enqueue(neighbour);
-                    }
-                }
-            }
-            Instantiate(currentNode.nodeTile.Object, currentNode.nodePos, Quaternion.identity, transform);
+            nodesStack.Push(currentNode);
             
-            //Lower the entropy of the neighbour nodes of the neighbour
-            if(collapsedNeighbours.Count > 0)
-                CollapseNeighboursNeighbour();
+            //Propagate the collapse to the neighbours
+            if(nodesStack.Count > 0)
+                PropagateCollapse();
             
         }
     }
 
-    void CollapseNeighboursNeighbour()
+    void PropagateCollapse()
     {
         List<int> possibleSockets = new();
-        while (collapsedNeighbours.Count > 0)
+        List<TileWFC> neighbourTiles;
+        while(nodesStack.Count > 0)
         {
-            Node currentNode = collapsedNeighbours.Dequeue();
+            Node currentNode = nodesStack.Pop();
             for (int i = 0; i < 4; i++)
             {
-                if(TryGetNeighborFromDirection(i, currentNode, out Node neighbour))
-                {
-                    if (neighbour.IsCollapsed)
-                        continue;
-                }
-                else 
+                if(!TryGetNeighborFromDirection(i, currentNode, out Node neighbour) || neighbour.IsCollapsed)
                     continue;
-
+                
                 foreach (TileWFC tile in currentNode.possibleTiles)
                 {
-                    if(possibleSockets.Contains(tile.GetSocket(i)))
-                        continue;
-                    possibleSockets.Add(tile.GetSocket(i));
+                    if(!possibleSockets.Contains(tile.GetSocket(i)))
+                        possibleSockets.Add(tile.GetSocket(i));
                 }
 
-                int neighbourSocketIndex = GetOppositeSide(i);
-                neighbourTiles = new(neighbour.possibleTiles); 
-
+                neighbourTiles = new(neighbour.possibleTiles);
                 foreach (TileWFC tile in neighbourTiles)
                 {
-                    if(!possibleSockets.Contains(tile.GetSocket(neighbourSocketIndex)))
+                    int neighbourSocket = tile.GetSocket(GetOppositeSide(i));
+                    if(!possibleSockets.Contains(neighbourSocket))
                         neighbour.possibleTiles.Remove(tile);
                 }
 
-                if(neighbour.possibleTiles.Count != neighbourTiles.Count)
+                if(neighbourTiles.Count != neighbour.possibleTiles.Count)
                 {
                     nodesToCollapse.SortUp(neighbour);
-                    if(!collapsedNeighbours.Contains(neighbour))
-                        collapsedNeighbours.Enqueue(neighbour);
+                    nodesStack.Push(neighbour);
                 }
+
+                possibleSockets.Clear();
             }
         }
     }
