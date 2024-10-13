@@ -13,6 +13,7 @@ public class UIManager : MonoBehaviour
     [SerializeField] TextMeshProUGUI ySizeText;
     [SerializeField] Slider ySizeSlider;
     [SerializeField] TextMeshProUGUI tilesAmountText;
+    [SerializeField] Button generateButton;
     [SerializeField] TextMeshProUGUI timeToGenerate;
 
     void Awake()
@@ -31,6 +32,12 @@ public class UIManager : MonoBehaviour
         {
             wfc.gridSizeY = value;
             UpdateUI();
+        });
+
+        generateButton.onClick.AddListener(() =>
+        {
+            wfc.WaveFunctionCollapse();
+            timeToGenerate.text = "Time to Generate:\r\n" + wfc.timeToGenerate + " seconds";
         });
     }
 

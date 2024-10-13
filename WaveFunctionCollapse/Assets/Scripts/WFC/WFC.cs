@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Diagnostics;
 using UnityEngine;
 
 public class WFC : MonoBehaviour
@@ -13,6 +14,7 @@ public class WFC : MonoBehaviour
     public int NodesAmountX => Mathf.RoundToInt(gridSizeX / NodeDiameter);
     public int NodesAmountY => Mathf.RoundToInt(gridSizeY / NodeDiameter);
     Node[,] grid;
+    public float timeToGenerate;
 
     Heap<Node> nodesToCollapse;
     readonly Stack<Node> nodesStack = new();
@@ -21,7 +23,11 @@ public class WFC : MonoBehaviour
     {
         CreateGrid();
         ConvertArrayToHeap();
+        Stopwatch sw = new();
+        sw.Start();
         StartWaveFunctionCollapse();
+        sw.Stop();
+        timeToGenerate = sw.ElapsedMilliseconds / 1000f;
     }
 
     void CreateGrid()
