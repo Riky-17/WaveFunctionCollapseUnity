@@ -1,0 +1,12 @@
+#pragma kernel NodeRelaxation
+
+struct Node
+{
+
+};
+
+[numthreads(1,1,1)]
+void NodeRelaxation (uint3 id : SV_DispatchThreadID)
+{
+    
+}
