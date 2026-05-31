@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3dd93be1df2a9954dadfa5c84c7eb644, type: 3}
   m_Name: PathDownLeft
   m_EditorClassIdentifier: 
-  Object: {fileID: 4431968938771600995, guid: 183aa82a4b8f0f54193cf22a3b921f26, type: 3}
+  tile: {fileID: 4431968938771600995, guid: 183aa82a4b8f0f54193cf22a3b921f26, type: 3}
   upSocket: 0
   rightSocket: 0
   downSocket: 1

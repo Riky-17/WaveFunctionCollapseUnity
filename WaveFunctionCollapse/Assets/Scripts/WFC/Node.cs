@@ -3,13 +3,13 @@ using UnityEngine;
 
 public struct NodeInfo
 {
-    public byte possibleTiles;
+    public uint possibleTiles;
     public int entropy;
-    public byte tile;
+    public uint tile;
     public int x;
     public int y;
 
-    public NodeInfo(int x, int y, byte possibleTiles)
+    public NodeInfo(int x, int y, uint possibleTiles)
     {
         this.x = x;
         this.y = y;
@@ -62,10 +62,12 @@ public class Node : IHeapItem<Node>
             }
         }
 
-        nodeInfo.tile = (byte)(1 << positions[Random.Range(0, count)]);
+        nodeInfo.tile = (uint)(1 << positions[Random.Range(0, count)]);
         nodeInfo.possibleTiles = nodeInfo.tile;
         nodeInfo.entropy = 1;
     }
+
+    public void UpdateInfo(NodeInfo nodeInfo) => this.nodeInfo = nodeInfo;
 
     public int HeapIndex { get => heapIndex; set => heapIndex = value; }
 

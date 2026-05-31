@@ -1,9 +1,14 @@
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using UnityEngine;
+using Debug = UnityEngine.Debug;
 
 public class WFC : MonoBehaviour
 {
+    [SerializeField] ComputeShader NodeRelaxation;
+    int kernelIndex;
+
     //grid fields
     [SerializeField] List<TileWFC> tiles;
 
@@ -14,13 +19,24 @@ public class WFC : MonoBehaviour
     public int NodesAmountX => Mathf.RoundToInt(gridSizeX / NodeDiameter);
     public int NodesAmountY => Mathf.RoundToInt(gridSizeY / NodeDiameter);
 
-    byte[] compat;
+    uint[] compat;
 
-    Node[,] grid;
+    List<Node> grid;
+    NodeInfo[] gridCurrent;
+    NodeInfo[] gridNext;
+    Heap<Node> nodesToCollapse;
+
+    int[] changeFlag = new int[1];
+
+    ComputeBuffer gridCurrentBuff;
+    ComputeBuffer gridNextBuff;
+    ComputeBuffer changeFlagBuff;
+
     public float timeToGenerate;
 
-    Heap<Node> nodesToCollapse;
-    readonly Stack<Node> nodesStack = new();
+    Stopwatch whileSW;
+
+    bool updateGrid;
 
     readonly List<Vector2Int> directions = new()
     {
@@ -37,13 +53,19 @@ public class WFC : MonoBehaviour
     //     UnityEngine.Debug.Log(b);
     // }
 
-    public void WaveFunctionCollapse()
+    void Awake()
     {
         GetTilesCompat();
-        CreateGrid();
-        ConvertArrayToHeap();
+        whileSW = new();
+    }
+
+    public void WaveFunctionCollapse()
+    {
         Stopwatch sw = new();
         sw.Start();
+        GetTilesCompat();
+        CreateGrid();
+        InitComputeShader();
         StartWaveFunctionCollapse();
         sw.Stop();
         timeToGenerate = sw.ElapsedMilliseconds / 1000f;
@@ -51,7 +73,7 @@ public class WFC : MonoBehaviour
 
     void GetTilesCompat()
     {
-        compat = new byte[tiles.Count * 4];
+        compat = new uint[tiles.Count * 4];
 
         for (int i = 0; i < tiles.Count; i++)
         {
@@ -59,14 +81,14 @@ public class WFC : MonoBehaviour
 
             for (int d = 0; d < directions.Count; d++)
             {
-                byte compTiles = 0;
+                uint compTiles = 0;
 
                 for (int j = 0; j < tiles.Count; j++)
                 {
                     TileWFC compTile = tiles[j];
 
                     if(tile.GetSocket(d) == compTile.GetSocket((d + 2) % directions.Count))
-                        compTiles |= (byte)(1 << j);
+                        compTiles |= (uint)(1 << j);
                 }
 
                 compat[i * 4 + d] = compTiles;
@@ -76,7 +98,13 @@ public class WFC : MonoBehaviour
 
     void CreateGrid()
     {
-        grid = new Node[NodesAmountX, NodesAmountY];
+        int totalNodes = NodesAmountX * NodesAmountY;
+
+        grid = new();
+        gridCurrent = new NodeInfo[totalNodes];
+        gridNext = new NodeInfo[totalNodes];
+        nodesToCollapse = new(totalNodes);
+
         Vector2 bottomLeft = new(-(gridSizeX / 2), -(gridSizeY / 2));
 
         for (int x = 0; x < NodesAmountX; x++)
@@ -88,56 +116,54 @@ public class WFC : MonoBehaviour
                 Vector2 nodePos = new Vector2(xPos, yPos) + bottomLeft;
                 NodeInfo nodeInfo = new(x, y, 0b11111111);
 
-                if(x == 0 || x == NodesAmountX - 1 || y == 0 || y == NodesAmountY - 1)
-                {
-                    for (int i = 0; i < 4; i++)
-                    {
-                        if (!HasNeighbour(i, x, y))
-                        {
-                            // foreach (TileWFC tile in tiles)
-                            // {
-                            //     if(tile.GetSocket(i) > 0)
-                            //     node.possibleTiles.Remove(tile);
-                            // }
-                            // node.collapsedNeighbours++;
-                        }
-                    }
-                }
+                // if(x == 0 || x == NodesAmountX - 1 || y == 0 || y == NodesAmountY - 1)
+                // {
+                //     for (int i = 0; i < 4; i++)
+                //     {
+                //         if (!HasNeighbour(i, x, y))
+                //         {
+                //             uint compTiles
+                //         }
+                //     }
+                // }
 
                 Node node = new(nodePos, nodeInfo);
-                grid[x, y] = node;
+                grid.Add(node);
+                gridCurrent[x * NodesAmountY + y] = nodeInfo;
+                nodesToCollapse.Add(node);
             }
         }
     }
 
-    void ConvertArrayToHeap()
+    void InitComputeShader()
     {
-        int width = grid.GetLength(0);
-        int height = grid.GetLength(1);
-        nodesToCollapse = new(width * height);
-        for (int x = 0; x < width; x++)
-        {
-            for (int y = 0; y < height; y++)
-            {
-                nodesToCollapse.Add(grid[x, y]);
-            }            
-        }
-    }
+        kernelIndex = NodeRelaxation.FindKernel("NodeRelaxation");
 
-    bool TryGetNeighbourFromDirection(int socketDir, Node currentNode, out Node neighbour)
-    {
-        Vector2Int direction = directions[socketDir];
-        int neighbourX = currentNode.NodeInfo.x + direction.x;
-        int neighbourY = currentNode.NodeInfo.y + direction.y;
+        ComputeBuffer directionsBuff = new(directions.Count, sizeof(int) * 2);
+        directionsBuff.SetData(directions);
+        NodeRelaxation.SetBuffer(kernelIndex, "directions", directionsBuff);
 
-        if(neighbourX < 0 || neighbourX >= NodesAmountX || neighbourY < 0 || neighbourY >= NodesAmountY)
-        {
-            neighbour = null;
-            return false;
-        }
+        gridCurrentBuff = new(gridCurrent.Length, sizeof(uint) * 2 + sizeof(int) * 3);
+        gridCurrentBuff.SetData(gridCurrent);
+        NodeRelaxation.SetBuffer(kernelIndex, "gridCurrent", gridCurrentBuff);
 
-        neighbour = grid[neighbourX, neighbourY];
-        return true;
+        gridNextBuff = new(gridNext.Length, sizeof(uint) * 2 + sizeof(int) * 3);
+        gridNextBuff.SetData(gridNext);
+        NodeRelaxation.SetBuffer(kernelIndex, "gridNext", gridNextBuff);
+
+        ComputeBuffer compatBuff = new(compat.Length, sizeof(uint));
+        compatBuff.SetData(compat);
+        NodeRelaxation.SetBuffer(kernelIndex, "compat", compatBuff);
+
+        changeFlag[0] = 0;
+        changeFlagBuff = new(1, sizeof(int));
+        changeFlagBuff.SetData(changeFlag);
+        NodeRelaxation.SetBuffer(kernelIndex, "changeFlag", changeFlagBuff);
+
+        NodeRelaxation.SetInt("tilesCount", tiles.Count);
+
+        NodeRelaxation.SetInt("gridSizeX", NodesAmountX);
+        NodeRelaxation.SetInt("gridSizeY", NodesAmountY);
     }
 
     bool HasNeighbour(int dir, int x, int y)
@@ -160,8 +186,74 @@ public class WFC : MonoBehaviour
         {
             currentNode = nodesToCollapse.RemoveFirst();
             currentNode.Collapse();
+            CreateTile(currentNode);
+            NodeInfo currentNodeInfo = currentNode.NodeInfo;
+            gridCurrent[currentNodeInfo.x * NodesAmountY + currentNodeInfo.y] = currentNodeInfo;
 
+            while (nodesToCollapse.HeapSize > 0 && nodesToCollapse.LookFirst().NodeInfo.entropy == 1)
+            {
+                currentNode = nodesToCollapse.RemoveFirst();
+                currentNode.Collapse();
+                CreateTile(currentNode);
+                currentNodeInfo = currentNode.NodeInfo;
+                gridCurrent[currentNodeInfo.x * NodesAmountY + currentNodeInfo.y] = currentNodeInfo;
+            }
 
+            if(nodesToCollapse.HeapSize == 0)
+                break;
+
+            gridCurrentBuff.SetData(gridCurrent);
+            NodeRelaxation.SetBuffer(kernelIndex, "gridCurrent", gridCurrentBuff);
+
+            NodeRelaxation.Dispatch(kernelIndex, NodesAmountX, NodesAmountY, 1);
+
+            gridNextBuff.GetData(gridNext);
+            changeFlagBuff.GetData(changeFlag);
+
+            gridCurrentBuff.SetData(gridNext);
+            NodeRelaxation.SetBuffer(kernelIndex, "gridCurrent", gridCurrentBuff);
+
+            int flag = changeFlag[0];
+            updateGrid = flag == 1;
+
+            while(flag == 1)
+            {
+                changeFlag[0] = 0;
+                changeFlagBuff.SetData(changeFlag);
+                NodeRelaxation.SetBuffer(kernelIndex, "changeFlag", changeFlagBuff);
+
+                NodeRelaxation.Dispatch(kernelIndex, NodesAmountX, NodesAmountY, 1);
+
+                gridNextBuff.GetData(gridNext);
+                changeFlagBuff.GetData(changeFlag);
+
+                gridCurrentBuff.SetData(gridNext);
+                NodeRelaxation.SetBuffer(kernelIndex, "gridCurrent", gridCurrentBuff);
+
+                flag = changeFlag[0];
+            }
+
+            if(!updateGrid)
+                continue;
+
+            for (int i = 0; i < gridNext.Length; i++)
+            {
+                Node node = grid[i];
+
+                if(node.NodeInfo.tile != 0)
+                    continue;
+
+                NodeInfo updatedInfo = gridNext[i];
+
+                if(updatedInfo.entropy == node.NodeInfo.entropy)
+                    continue;
+
+                // Debug.Log(node.NodeInfo.entropy + " " + updatedInfo.entropy);
+                // Debug.Log("x: " + updatedInfo.x + " y: " + updatedInfo.y + " Old: " + Convert.ToString(node.NodeInfo.possibleTiles, 2).PadLeft(8, '0') + " New: " + Convert.ToString(updatedInfo.possibleTiles, 2).PadLeft(8, '0'));
+                node.UpdateInfo(updatedInfo);
+                gridCurrent[i] = updatedInfo;
+                nodesToCollapse.SortUp(node);
+            }
         }
 
 
@@ -225,7 +317,19 @@ public class WFC : MonoBehaviour
         // }
     }
 
-    int GetOppositeSide(int side) => side + 2 < 4 ? side + 2 : side - 2;
+    public void CreateTile(Node node)
+    {
+        uint tileBit = node.NodeInfo.tile;
+        for (int i = 0; i < tiles.Count; i++)
+        {
+            if ((tileBit & (1 << i)) != 0)
+            {
+                GameObject tileObj = tiles[i].tile;
+                Instantiate(tileObj, node.nodePos, Quaternion.identity);
+                break;
+            }
+        }
+    }
 
     void OnDrawGizmos()
     {

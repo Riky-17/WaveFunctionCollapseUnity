@@ -1,4 +1,5 @@
 using System;
+using UnityEngine;
 
 public class Heap<T> where T : IHeapItem<T>
 {
@@ -27,6 +28,13 @@ public class Heap<T> where T : IHeapItem<T>
         SortDown(heap[0]);
 
         return itemToReturn; 
+    }
+
+    public T LookFirst()
+    {
+        if(HeapSize == 0)
+            throw new ArgumentOutOfRangeException();
+        return heap[0];
     }
 
     public void SortUp(T item)
