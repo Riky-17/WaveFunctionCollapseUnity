@@ -22,6 +22,7 @@ public class WFC : MonoBehaviour
     uint[] compat;
 
     List<Node> grid;
+    List<Node> collapsedNodes;
     NodeInfo[] gridCurrent;
     NodeInfo[] gridNext;
     Heap<Node> nodesToCollapse;
@@ -180,6 +181,7 @@ public class WFC : MonoBehaviour
 
     void StartWaveFunctionCollapse()
     {
+        collapsedNodes = new();
         Node currentNode;
 
         while(nodesToCollapse.HeapSize > 0)
@@ -187,6 +189,7 @@ public class WFC : MonoBehaviour
             currentNode = nodesToCollapse.RemoveFirst();
             currentNode.Collapse();
             CreateTile(currentNode);
+            collapsedNodes.Add(currentNode);
             NodeInfo currentNodeInfo = currentNode.NodeInfo;
             gridCurrent[currentNodeInfo.x * NodesAmountY + currentNodeInfo.y] = currentNodeInfo;
 
@@ -195,6 +198,7 @@ public class WFC : MonoBehaviour
                 currentNode = nodesToCollapse.RemoveFirst();
                 currentNode.Collapse();
                 CreateTile(currentNode);
+                collapsedNodes.Add(currentNode);
                 currentNodeInfo = currentNode.NodeInfo;
                 gridCurrent[currentNodeInfo.x * NodesAmountY + currentNodeInfo.y] = currentNodeInfo;
             }
@@ -215,6 +219,7 @@ public class WFC : MonoBehaviour
 
             int flag = changeFlag[0];
             updateGrid = flag == 1;
+            int dispatchCount = 1;
 
             while(flag == 1)
             {
@@ -231,32 +236,46 @@ public class WFC : MonoBehaviour
                 NodeRelaxation.SetBuffer(kernelIndex, "gridCurrent", gridCurrentBuff);
 
                 flag = changeFlag[0];
+                dispatchCount++;
             }
 
             if(!updateGrid)
                 continue;
 
-            for (int i = 0; i < gridNext.Length; i++)
+            for (int i = 0; i < collapsedNodes.Count; i++)
             {
-                Node node = grid[i];
+                Node collapsedNode = collapsedNodes[i];
+                NodeInfo collapsedInfo = collapsedNode.NodeInfo;
 
-                if(node.NodeInfo.tile != 0)
-                    continue;
+                for (int j = -dispatchCount; j < dispatchCount; j++)
+                {
+                    int nodeIndex = j + collapsedInfo.x * NodesAmountY + collapsedInfo.y;
 
-                NodeInfo updatedInfo = gridNext[i];
+                    if(!IsInRange(nodeIndex, 0, (NodesAmountX * NodesAmountY) - 1))
+                        continue;
 
-                if(updatedInfo.entropy == node.NodeInfo.entropy)
-                    continue;
+                    Node node = grid[nodeIndex];
 
-                // Debug.Log(node.NodeInfo.entropy + " " + updatedInfo.entropy);
-                // Debug.Log("x: " + updatedInfo.x + " y: " + updatedInfo.y + " Old: " + Convert.ToString(node.NodeInfo.possibleTiles, 2).PadLeft(8, '0') + " New: " + Convert.ToString(updatedInfo.possibleTiles, 2).PadLeft(8, '0'));
-                node.UpdateInfo(updatedInfo);
-                gridCurrent[i] = updatedInfo;
-                nodesToCollapse.SortUp(node);
+                    if(node.NodeInfo.tile != 0)
+                        continue;
+    
+                    NodeInfo updatedInfo = gridNext[nodeIndex];
+    
+                    if(updatedInfo.entropy == node.NodeInfo.entropy)
+                        continue;
+    
+                    node.UpdateInfo(updatedInfo);
+                    gridCurrent[nodeIndex] = updatedInfo;
+                    nodesToCollapse.SortUp(node);
+                }
             }
+
+            collapsedNodes.Clear();
         }
 
 
+                    // Debug.Log(node.NodeInfo.entropy + " " + updatedInfo.entropy);
+                    // Debug.Log("x: " + updatedInfo.x + " y: " + updatedInfo.y + " Old: " + Convert.ToString(node.NodeInfo.possibleTiles, 2).PadLeft(8, '0') + " New: " + Convert.ToString(updatedInfo.possibleTiles, 2).PadLeft(8, '0'));
 
 
 
@@ -316,6 +335,8 @@ public class WFC : MonoBehaviour
             
         // }
     }
+
+    public bool IsInRange(int x, int min, int max) => x >= min && x <= max;
 
     public void CreateTile(Node node)
     {

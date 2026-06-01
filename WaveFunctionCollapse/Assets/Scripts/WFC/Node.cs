@@ -32,6 +32,7 @@ public class Node : IHeapItem<Node>
     NodeInfo nodeInfo;
     int heapIndex;
     public Vector2 nodePos;
+    public int HeapIndex { get => heapIndex; set => heapIndex = value; }
 
     public Node(Vector2 pos, NodeInfo nodeInfo)
     {
@@ -69,7 +70,6 @@ public class Node : IHeapItem<Node>
 
     public void UpdateInfo(NodeInfo nodeInfo) => this.nodeInfo = nodeInfo;
 
-    public int HeapIndex { get => heapIndex; set => heapIndex = value; }
 
     public int CompareTo(Node other)
     {
