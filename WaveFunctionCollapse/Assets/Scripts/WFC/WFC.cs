@@ -246,39 +246,24 @@ public class WFC : MonoBehaviour
 
     private void UpdateInfo()
     {
-        Debug.Log(dispatchCount);
-        for (int i = 0; i < collapsedNodes.Count; i++)
+        for (int i = 0; i < gridNext.Length; i++)
         {
-            Node collapsedNode = collapsedNodes[i];
-            NodeInfo collapsedInfo = collapsedNode.NodeInfo;
+            Node node = grid[i];
+            NodeInfo nodeInfo = node.NodeInfo;
 
-            for (int j = -dispatchCount; j < dispatchCount; j++)
-            {
-                int nodeIndex = j + collapsedInfo.x * NodesAmountY + collapsedInfo.y;
+            if(nodeInfo.tile != 0)
+                continue;
 
-                if (!IsInRange(nodeIndex, 0, (NodesAmountX * NodesAmountY) - 1))
-                    continue;
+            NodeInfo updatedInfo = gridNext[i];
 
-                Node node = grid[nodeIndex];
-                NodeInfo updatedInfo = gridNext[nodeIndex]; 
+            if(nodeInfo.entropy == updatedInfo.entropy)
+                continue;
 
-                if (node.NodeInfo.tile != 0)
-                    continue;
-
-
-                if (updatedInfo.entropy == node.NodeInfo.entropy)
-                    continue;
-
-                node.UpdateInfo(updatedInfo);
-                gridCurrent[nodeIndex] = updatedInfo;
-                nodesToCollapse.SortUp(node);
-            }
+            node.UpdateInfo(updatedInfo);
+            gridCurrent[i] = updatedInfo;
+            nodesToCollapse.SortUp(node);
         }
 
-        foreach (NodeInfo info in gridCurrent)
-        {
-            Debug.Log(info.x + " " + info.y + " " + Convert.ToString(info.possibleTiles, 2).PadLeft(8, '0') + " " + Convert.ToString(info.tile, 2).PadLeft(8, '0') + " " + info.entropy);
-        }
         updateGrid = false;
         RunIteration();
     }
@@ -322,7 +307,6 @@ public class WFC : MonoBehaviour
             gridCurrentBuff.SetData(gridNext);
             NodeRelaxation.SetBuffer(kernelIndex, "gridCurrent", gridCurrentBuff);
 
-            changeFlag[0] = 0;
             changeFlagBuff.SetData(changeFlag);
             NodeRelaxation.SetBuffer(kernelIndex, "changeFlag", changeFlagBuff);
             Dispatch();
@@ -349,16 +333,6 @@ public class WFC : MonoBehaviour
 
         NodeInfo currentNodeInfo = currentNode.NodeInfo;
         gridCurrent[currentNodeInfo.x * NodesAmountY + currentNodeInfo.y] = currentNodeInfo;
-
-        // Node testNode = nodesToCollapse.LookFirst();
-        // if(testNode.NodeInfo.x == 9 && testNode.NodeInfo.y == 0)
-        // {
-        //     Node testNeighbour = grid[9 * NodesAmountY + 1];
-        //     Debug.Log(testNeighbour.NodeInfo.entropy + " " + Convert.ToString(testNeighbour.NodeInfo.possibleTiles, 2).PadLeft(8, '0'));
-        //     Debug.Log(testNode.NodeInfo.entropy + " " + Convert.ToString(testNode.NodeInfo.possibleTiles, 2).PadLeft(8, '0'));
-        //     Debug.Log(Convert.ToString(testNode.NodeInfo.possibleTiles & testNeighbour.NodeInfo.tile, 2).PadLeft(8, '0'));
-        // }
-
         
         while (nodesToCollapse.HeapSize > 0 && nodesToCollapse.LookFirst().NodeInfo.entropy == 1)
         {
@@ -394,6 +368,122 @@ public class WFC : MonoBehaviour
             }
         }
     }
+
+    // int countbits(uint x)
+    // {
+    //     int count = 0;
+
+    //     for (int i = 0; i < tiles.Count; i++)
+    //     {
+    //         if((x & (1 << i)) != 0)
+    //             count++;
+    //     }
+    //     return count;
+    // }
+
+    // int firstbitlow(uint x)
+    // {
+    //     for (int i = 0; i < tiles.Count; i++)
+    //     {
+    //         if((x & (1 << i)) != 0)
+    //             return i;
+    //     }
+
+    //     return - 1;
+    // }
+
+    // uint CompNeighTiles(int dToN, int t )
+    // {
+    //     return compat[t * 4 + (dToN + 2) % 4];
+    // }
+
+    // float IsInRangeFloat(int x, int min, int max)
+    // {
+    //     if(x >= min && x <= max)
+    //         return 1;
+
+    //     return 0;
+    // }
+
+    // void NodeRelaxationDispatch (int x, int y)
+    // {
+
+    //     int index = x * NodesAmountY + y;
+    //     NodeInfo node = gridCurrent[index];
+        
+        
+    //     if(node.tile != 0)
+    //     {
+    //         gridNext[index] = node;
+    //         return;
+    //     }
+
+    //     uint possibleTiles = node.possibleTiles;
+
+    //     Debug.Log(x + " " + y);
+
+    //     for (int d = 0; d < 4; d++) 
+    //     {
+    //         Vector2Int direction = directions[d];
+
+    //         int neighbourX = x + direction.x;
+    //         int neighbourY = y + direction.y;
+
+    //         float hasNeighbour = IsInRangeFloat(neighbourX, 0, NodesAmountX - 1) * IsInRangeFloat(neighbourY, 0, NodesAmountY - 1);
+
+    //         if(hasNeighbour < 0.5)
+    //             continue;
+            
+    //         int neighbourIndex = neighbourX * NodesAmountY + neighbourY;
+    //         NodeInfo neighbour = gridCurrent[neighbourIndex];
+            
+    //         if(neighbour.entropy == 1)
+    //         {
+    //             int t = firstbitlow(neighbour.possibleTiles);
+    //             uint connectingTiles = CompNeighTiles(d, t);
+
+    //             Debug.Log("1 Entropy: " + Binary(possibleTiles) + " " + Binary(connectingTiles) + " " + Binary(neighbour.possibleTiles));
+    //             possibleTiles &= connectingTiles;
+
+
+    //             if(possibleTiles != node.possibleTiles)
+    //                 changeFlag[0] = 1;
+
+    //             continue;
+    //         }
+            
+    //         uint neighbourTiles = neighbour.possibleTiles;
+    //         uint neighbourTilesDup = neighbourTiles;
+    //         uint possibleConnTiles = 0;
+
+    //         while(neighbourTilesDup != 0)
+    //         {
+    //             int t = firstbitlow(neighbourTilesDup);
+
+    //             uint connectingTiles = CompNeighTiles(d, t);
+    //             possibleConnTiles |= connectingTiles;
+
+    //             neighbourTilesDup &= (neighbourTilesDup - 1);
+    //         }
+
+    //         Debug.Log("Mult Entropy: " + Binary(possibleTiles) + " " + Binary(possibleConnTiles) + " " + Binary(neighbourTiles));
+
+    //         possibleTiles &= possibleConnTiles;
+    //     }
+
+    //     Debug.Log("Comparison :" + Binary(possibleTiles) + " " + Binary(node.possibleTiles));
+
+    //     if(possibleTiles != node.possibleTiles)
+    //     {
+    //         changeFlag[0] = 1;
+    //         node.possibleTiles = possibleTiles;
+    //         node.entropy = countbits(possibleTiles);
+    //     }
+
+    //     gridNext[index] = node;
+    // }
+
+    string Binary(uint x) => Convert.ToString(x, 2).PadLeft(8, '0');
 
     void OnDrawGizmos()
     {

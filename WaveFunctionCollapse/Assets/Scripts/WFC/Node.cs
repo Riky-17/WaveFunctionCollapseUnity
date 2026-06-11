@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -65,8 +66,9 @@ public class Node : IHeapItem<Node>
                 count++;
             }
         }
+        
 
-        nodeInfo.tile = (uint)(1 << positions[Random.Range(0, count)]);
+        nodeInfo.tile = (uint)(1 << positions[UnityEngine.Random.Range(0, count)]);
         nodeInfo.possibleTiles = nodeInfo.tile;
         nodeInfo.entropy = 1;
     }

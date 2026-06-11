@@ -1641,40 +1641,9 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 69c90e0d8130fdc44ac127c9c4d23798, type: 2}
   - {fileID: 11400000, guid: 72760ceac3c87514390ccf5d7ba36336, type: 2}
   - {fileID: 11400000, guid: 1b134f636a837c2469fc6ebd8839436b, type: 2}
-  gridSizeX: 9
-  gridSizeY: 9
+  gridSizeX: 100
+  gridSizeY: 100
   timeToGenerate: 0
---- !u!1 &1495972411
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1495972412}
-  m_Layer: 0
-  m_Name: GameObject
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1495972412
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1495972411}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -4.5, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1793021055
 GameObject:
   m_ObjectHideFlags: 0
@@ -2194,4 +2163,3 @@ SceneRoots:
   - {fileID: 1491416567}
   - {fileID: 1793021059}
   - {fileID: 1356362056}
-  - {fileID: 1495972412}
