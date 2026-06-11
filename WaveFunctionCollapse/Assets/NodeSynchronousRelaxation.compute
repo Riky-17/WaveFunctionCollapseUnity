@@ -25,7 +25,7 @@ int gridSizeY;
 
 float IsInRange(int x, int min, int max)
 {
-    return step(min, x) * step(x, max);
+    return (x >= min) * (x <= max);
 }
 
 uint CompNeighTiles(uint dToN, int t )
@@ -42,6 +42,7 @@ void NodeRelaxation (uint3 groupID : SV_GROUPID)
     int index = x * gridSizeY + y;
     Node node = gridCurrent[index];
     
+    
     if(node.tile != 0)
     {
         gridNext[index] = node;
@@ -49,7 +50,6 @@ void NodeRelaxation (uint3 groupID : SV_GROUPID)
     }
 
     uint possibleTiles = node.possibleTiles;
-    int entropy = 0;
 
     for (int d = 0; d < 4; d++) 
     {
@@ -68,18 +68,16 @@ void NodeRelaxation (uint3 groupID : SV_GROUPID)
         
         if(neighbour.entropy == 1)
         {
-            int t = firstbitlow(neighbour.tile);
+            int t = firstbitlow(neighbour.possibleTiles);
             uint connectingTiles = CompNeighTiles(d, t);
 
             possibleTiles &= connectingTiles;
-            entropy = countbits(possibleTiles);
 
-            if(entropy != node.entropy)
+            if(possibleTiles != node.possibleTiles)
                 changeFlag[0] = 1;
 
             continue;
         }
-        
         
         uint neighbourTiles = neighbour.possibleTiles;
         uint neighbourTilesDup = neighbourTiles;
@@ -96,13 +94,15 @@ void NodeRelaxation (uint3 groupID : SV_GROUPID)
         }
 
         possibleTiles &= possibleConnTiles;
-        entropy = countbits(possibleTiles);
-
-        if(entropy != node.entropy)
-            changeFlag[0] = 1;
     }
 
-    node.possibleTiles = possibleTiles;
-    node.entropy = entropy;
+    if(possibleTiles != node.possibleTiles)
+    {
+        changeFlag[0] = 1;
+        node.possibleTiles = possibleTiles;
+        node.entropy = countbits(possibleTiles);
+    }
+
+    node.tile = 0;
     gridNext[index] = node;
 }

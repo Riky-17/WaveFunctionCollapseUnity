@@ -43,9 +43,12 @@ public class Node : IHeapItem<Node>
     public void Collapse()
     {
         if(nodeInfo.possibleTiles == 0)
+        {
+            // Debug.Log(nodeInfo.entropy + " " + nodeInfo.possibleTiles);
             throw new System.IndexOutOfRangeException();
+        }
 
-        if(nodeInfo.entropy == 1)
+        if (nodeInfo.entropy == 1)
         {
             nodeInfo.tile = nodeInfo.possibleTiles;
             return;
@@ -73,7 +76,7 @@ public class Node : IHeapItem<Node>
 
     public int CompareTo(Node other)
     {
-        int compare = nodeInfo.entropy.CompareTo(nodeInfo.entropy);
+        int compare = nodeInfo.entropy.CompareTo(other.nodeInfo.entropy);
         return -compare;
     }
 }
