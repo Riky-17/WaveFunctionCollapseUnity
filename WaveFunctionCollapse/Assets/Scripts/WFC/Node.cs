@@ -34,6 +34,7 @@ public class Node : IHeapItem<Node>
     int heapIndex;
     public Vector2 nodePos;
     public int HeapIndex { get => heapIndex; set => heapIndex = value; }
+    public int chunkIndex = -1;
 
     public Node(Vector2 pos, NodeInfo nodeInfo)
     {

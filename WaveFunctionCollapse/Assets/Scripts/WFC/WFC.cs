@@ -27,13 +27,16 @@ public class WFC : MonoBehaviour
     public int NodesAmountX => Mathf.RoundToInt(gridSizeX / NodeDiameter);
     public int NodesAmountY => Mathf.RoundToInt(gridSizeY / NodeDiameter);
 
+    [SerializeField] int chunkSize = 32;
+    [SerializeField] int gapSize = 2;
+
     uint[] compat;
 
     List<Node> grid;
-    List<Node> collapsedNodes;
     NodeInfo[] gridCurrent;
     NodeInfo[] gridNext;
-    Heap<Node> nodesToCollapse;
+    List<Heap<Node>> chunks;
+    Heap<Node> gap;
 
     int[] changeFlag = new int[1];
     int flag = 0;
@@ -47,7 +50,6 @@ public class WFC : MonoBehaviour
     public float timeToGenerate;
 
     bool updateGrid;
-    int dispatchCount;
 
     bool aDone = false;
     bool bDone = false;
@@ -119,12 +121,22 @@ public class WFC : MonoBehaviour
 
     void CreateGrid()
     {
-        int totalNodes = NodesAmountX * NodesAmountY;
+        int chunksAmountX = (NodesAmountX + gapSize) / (chunkSize + gapSize);
+        int chunksAmountY = (NodesAmountY + gapSize) / (chunkSize + gapSize);
+        int totalChunks = chunksAmountX * chunksAmountY;
+        chunks = new ();
+
+        for (int i = 0; i < totalChunks; i++)
+            chunks.Add(new(chunkSize * chunkSize));
 
         grid = new();
+
+        int totalNodes = NodesAmountX * NodesAmountY;
         gridCurrent = new NodeInfo[totalNodes];
         gridNext = new NodeInfo[totalNodes];
-        nodesToCollapse = new(totalNodes);
+
+        int nodesInGap = totalNodes - (chunkSize * chunkSize * totalChunks);
+        gap = new(nodesInGap);
 
         Vector2 bottomLeft = new(-(gridSizeX / 2), -(gridSizeY / 2));
 
@@ -134,6 +146,7 @@ public class WFC : MonoBehaviour
             {
                 float xPos = nodeRadius + NodeDiameter * x;
                 float yPos = nodeRadius + NodeDiameter * y;
+                bool isInChunk = x < (chunkSize + gapSize) * chunksAmountX &&  x % (chunkSize + gapSize) < chunkSize && y < (chunkSize + gapSize) * chunksAmountY && y % (chunkSize + gapSize) < chunkSize; 
                 Vector2 nodePos = new Vector2(xPos, yPos) + bottomLeft;
                 NodeInfo nodeInfo = new(x, y, 0b11111111);
 
@@ -157,11 +170,20 @@ public class WFC : MonoBehaviour
                     nodeInfo.entropy = entropy;
                 }
 
-                // Debug.Log(x + " " + y + " " + Convert.ToString(nodeInfo.possibleTiles, 2).PadLeft(8, '0'));
                 Node node = new(nodePos, nodeInfo);
                 grid.Add(node);
                 gridCurrent[x * NodesAmountY + y] = nodeInfo;
-                nodesToCollapse.Add(node);
+
+                if(isInChunk)
+                {
+                    int chunkX = Mathf.FloorToInt(x / (chunkSize + gapSize));
+                    int chunkY = Mathf.FloorToInt(y / (chunkSize + gapSize));
+                    int chunkIndex = chunkX * chunksAmountY + chunkY;
+                    node.chunkIndex = chunkIndex;
+                    chunks[chunkIndex].Add(node);
+                }
+                else
+                    gap.Add(node);
             }
         }
     }
@@ -211,29 +233,12 @@ public class WFC : MonoBehaviour
 
     void StartWaveFunctionCollapse()
     {
-        collapsedNodes = new();
-
         RunIteration();
-
-        // while(nodesToCollapse.HeapSize > 0)
-        // {
-        //     Collapse();
-
-        //     if (nodesToCollapse.HeapSize == 0)
-        //         break;
-
-        //         Dispatch();
-
-        //     if (!updateGrid)
-        //         continue;
-
-        //     UpdateInfo();
-        // }
     }
 
     void RunIteration()
     {
-        if(nodesToCollapse.HeapSize == 0)
+        if(gap.HeapSize == 0)
         {
             sw.Stop();
             timeToGenerate = sw.ElapsedMilliseconds / 1000f;
@@ -261,7 +266,10 @@ public class WFC : MonoBehaviour
 
             node.UpdateInfo(updatedInfo);
             gridCurrent[i] = updatedInfo;
-            nodesToCollapse.SortUp(node);
+            if(node.chunkIndex == -1)
+                gap.SortUp(node);
+            else
+                chunks[node.chunkIndex].SortUp(node);
         }
 
         updateGrid = false;
@@ -302,7 +310,6 @@ public class WFC : MonoBehaviour
         if(flag == 1)
         {
             updateGrid = true;
-            dispatchCount++;
 
             gridCurrentBuff.SetData(gridNext);
             NodeRelaxation.SetBuffer(kernelIndex, "gridCurrent", gridCurrentBuff);
@@ -321,27 +328,34 @@ public class WFC : MonoBehaviour
 
     private void Collapse()
     {
-        collapsedNodes.Clear();
+        if(chunks.Count > 0)
+        {
+            for (int i = chunks.Count - 1; i >= 0; i--)
+            {
+                Heap<Node> heap = chunks[i];
+                CollapseHeap(heap);
+            }
+        }
+        else
+            CollapseHeap(gap);
+    }
 
+    private void CollapseHeap(Heap<Node> nodesToCollapse)
+    {
         Node currentNode = nodesToCollapse.RemoveFirst();
         currentNode.Collapse();
 
         CreateTile(currentNode);
 
-        collapsedNodes.Add(currentNode);
-
-
         NodeInfo currentNodeInfo = currentNode.NodeInfo;
         gridCurrent[currentNodeInfo.x * NodesAmountY + currentNodeInfo.y] = currentNodeInfo;
-        
+
         while (nodesToCollapse.HeapSize > 0 && nodesToCollapse.LookFirst().NodeInfo.entropy == 1)
         {
             currentNode = nodesToCollapse.RemoveFirst();
             currentNode.Collapse();
 
             CreateTile(currentNode);
-
-            collapsedNodes.Add(currentNode);
 
             currentNodeInfo = currentNode.NodeInfo;
             gridCurrent[currentNodeInfo.x * NodesAmountY + currentNodeInfo.y] = currentNodeInfo;
@@ -350,7 +364,8 @@ public class WFC : MonoBehaviour
         gridCurrentBuff.SetData(gridCurrent);
         NodeRelaxation.SetBuffer(kernelIndex, "gridCurrent", gridCurrentBuff);
 
-        dispatchCount = 1;
+        if(nodesToCollapse.HeapSize == 0)
+            chunks.Remove(nodesToCollapse);
     }
 
     public bool IsInRange(int x, int min, int max) => x >= min && x <= max;
