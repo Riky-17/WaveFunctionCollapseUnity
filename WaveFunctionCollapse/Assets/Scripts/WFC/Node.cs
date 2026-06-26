@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -27,28 +26,26 @@ public struct NodeInfo
     }
 }
 
-public class Node : IHeapItem<Node>
+public class Node
 {
     public NodeInfo NodeInfo => nodeInfo;
     NodeInfo nodeInfo;
-    int heapIndex;
+    NodeInfo originalInfo;
     public Vector2 nodePos;
-    public int HeapIndex { get => heapIndex; set => heapIndex = value; }
+    public int heapIndex;
     public int chunkIndex = -1;
 
     public Node(Vector2 pos, NodeInfo nodeInfo)
     {
         nodePos = pos;
         this.nodeInfo = nodeInfo;
+        originalInfo = nodeInfo;
     }
 
     public void Collapse()
     {
         if(nodeInfo.possibleTiles == 0)
-        {
-            // Debug.Log(nodeInfo.entropy + " " + nodeInfo.possibleTiles);
             throw new System.IndexOutOfRangeException();
-        }
 
         if (nodeInfo.entropy == 1)
         {
@@ -69,13 +66,14 @@ public class Node : IHeapItem<Node>
         }
         
 
-        nodeInfo.tile = (uint)(1 << positions[UnityEngine.Random.Range(0, count)]);
+        nodeInfo.tile = (uint)(1 << positions[Random.Range(0, count)]);
         nodeInfo.possibleTiles = nodeInfo.tile;
         nodeInfo.entropy = 1;
     }
 
-    public void UpdateInfo(NodeInfo nodeInfo) => this.nodeInfo = nodeInfo;
+    public void Reset() => nodeInfo = originalInfo;
 
+    public void UpdateInfo(NodeInfo nodeInfo) => this.nodeInfo = nodeInfo;
 
     public int CompareTo(Node other)
     {

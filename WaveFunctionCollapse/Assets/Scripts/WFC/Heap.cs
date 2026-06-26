@@ -1,47 +1,55 @@
 using System;
 using UnityEngine;
 
-public class Heap<T> where T : IHeapItem<T>
+public class Heap
 {
-    T[] heap;
+    Node[] heap;
+    public Vector2Int direction => directions[directionsIndex];
+    Vector2Int[] directions;
+    public int directionsIndex = 0;
+    public Vector2Int startCoord;
     public int HeapSize {get; private set;}
 
-    public Heap(int maxHeapSize)
+    public Heap(int maxHeapSize) : this(maxHeapSize, null, default) {}
+
+    public Heap(int maxHeapSize, Vector2Int[] directions, Vector2Int startCoord)
     {
-        heap = new T[maxHeapSize];
+        heap = new Node[maxHeapSize];
+        this.directions = directions;
+        this.startCoord = startCoord;
     }
 
-    public void Add(T item)
+    public void Add(Node item)
     {
-        item.HeapIndex = HeapSize;
+        item.heapIndex = HeapSize;
         heap[HeapSize] = item;
         SortUp(item);
         HeapSize++;
     }
 
-    public T RemoveFirst()
+    public Node RemoveFirst()
     {
-        T itemToReturn = heap[0];
+        Node itemToReturn = heap[0];
         HeapSize--;
         heap[0] = heap[HeapSize];
-        heap[0].HeapIndex = 0;
+        heap[0].heapIndex = 0;
         SortDown(heap[0]);
 
         return itemToReturn; 
     }
 
-    public T LookFirst()
+    public Node LookFirst()
     {
         if(HeapSize == 0)
             throw new ArgumentOutOfRangeException();
         return heap[0];
     }
 
-    public void SortUp(T item)
+    public void SortUp(Node item)
     {
         while (true)
         {
-            int parentIndex = (item.HeapIndex - 1) / 2;
+            int parentIndex = (item.heapIndex - 1) / 2;
             if (item.CompareTo(heap[parentIndex]) <= 0)
                 break;
 
@@ -49,12 +57,12 @@ public class Heap<T> where T : IHeapItem<T>
         }
     }
 
-    void SortDown(T item)
+    void SortDown(Node item)
     {
         while (true)
         {
-            int childLeftIndex = item.HeapIndex * 2 + 1;
-            int childRightIndex = item.HeapIndex * 2 + 2;
+            int childLeftIndex = item.heapIndex * 2 + 1;
+            int childRightIndex = item.heapIndex * 2 + 2;
             int swapIndex;
 
             if(childLeftIndex < HeapSize)
@@ -75,15 +83,12 @@ public class Heap<T> where T : IHeapItem<T>
         }
     }
 
-    void Swap(T item1, T item2)
+    void Swap(Node item1, Node item2)
     {
-        heap[item1.HeapIndex] = item2;
-        heap[item2.HeapIndex] = item1;
-        (item1.HeapIndex, item2.HeapIndex) = (item2.HeapIndex, item1.HeapIndex);
+        heap[item1.heapIndex] = item2;
+        heap[item2.heapIndex] = item1;
+        (item1.heapIndex, item2.heapIndex) = (item2.heapIndex, item1.heapIndex);
     }
-}
 
-public interface IHeapItem<T> : IComparable<T>
-{
-    int HeapIndex { get; set; }
+    public bool IsDone() => directionsIndex >= directions.Length || directions == null;
 }
