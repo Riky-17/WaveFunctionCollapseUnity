@@ -50,6 +50,8 @@ public class Heap
         while (true)
         {
             int parentIndex = (item.heapIndex - 1) / 2;
+            // if(WFC.test == 3)
+            // Debug.Log(item.NodeInfo.entropy + " " + heap[parentIndex].NodeInfo.entropy + " " + item.CompareTo(heap[parentIndex]));
             if (item.CompareTo(heap[parentIndex]) <= 0)
                 break;
 
@@ -90,5 +92,9 @@ public class Heap
         (item1.heapIndex, item2.heapIndex) = (item2.heapIndex, item1.heapIndex);
     }
 
-    public bool IsDone() => directionsIndex >= directions.Length || directions == null;
+    public bool IsDone()
+    {
+        // Debug.Log(directionsIndex + " " + directions.Length);
+        return directions == null || directionsIndex >= directions.Length;
+    }
 }

@@ -55,6 +55,8 @@ public class WFC : MonoBehaviour
 
     bool aDone = false;
     bool bDone = false;
+
+    public static int test = 0;
     Stopwatch sw;
 
     readonly List<Vector2Int> directions = new()
@@ -213,9 +215,6 @@ public class WFC : MonoBehaviour
                 }
 
                 Node node = new(nodePos, nodeInfo);
-                grid[x, y] = node;
-                gridCurrent[x * NodesAmountY + y] = nodeInfo;
-
 
                 if(x % TotalChunkSize < subChunkSize && y % TotalChunkSize < subChunkSize)
                 {
@@ -225,6 +224,9 @@ public class WFC : MonoBehaviour
                     node.chunkIndex = chunkIndex;
                     heaps[chunkIndex].Add(node);
                 }
+
+                grid[x, y] = node;
+                gridCurrent[x * NodesAmountY + y] = nodeInfo;
             }
         }
     }
@@ -277,25 +279,6 @@ public class WFC : MonoBehaviour
         Collapse();
     }
 
-    // void RunIteration()
-    // {
-    //     UpdatePass();
-
-    //     if(heapsDone == heaps.Length)
-    //     {
-    //         sw.Stop();
-    //         timeToGenerate = sw.ElapsedMilliseconds / 1000f;
-
-    //         foreach (Node node in grid)
-    //             CreateTile(node);
-                
-    //         return;
-    //     }
-
-    //     Collapse();
-    //     Dispatch();
-    // }
-
     private void UpdateInfo()
     {
         for (int i = 0; i < gridNext.Length; i++)
@@ -307,8 +290,10 @@ public class WFC : MonoBehaviour
                 continue;
 
             NodeInfo updatedInfo = gridNext[i];
+            if(test == 3)
+                Debug.Log(nodeInfo.x + " " + nodeInfo.y + " " + Convert.ToString(nodeInfo.possibleTiles, 2).PadLeft(8, '0') + " " + Convert.ToString(updatedInfo.possibleTiles, 2).PadLeft(8, '0') + " " + Convert.ToString(node.NodeInfo.possibleTiles, 2).PadLeft(8, '0') + " " + node.chunkIndex);
 
-            if(nodeInfo.entropy == updatedInfo.entropy)
+            if(nodeInfo.possibleTiles == updatedInfo.possibleTiles)
                 continue;
 
             node.UpdateInfo(updatedInfo);
@@ -330,6 +315,19 @@ public class WFC : MonoBehaviour
             if(request.hasError)
                 return;
             gridNext = request.GetData<NodeInfo>().ToArray();
+            // if (test)
+            // {
+            //     for (int i = 0; i < gridNext.Length; i++)
+            //     {
+            //         NodeInfo old = gridCurrent[i];
+            //         if(old.tile != 0)
+            //             continue;
+    
+            //         NodeInfo newInfo = gridNext[i];
+            //         Debug.Log(old.x + " " + old.y + " " + Convert.ToString(old.possibleTiles, 2).PadLeft(8, '0') + " " + Convert.ToString(newInfo.possibleTiles, 2).PadLeft(8, '0'));
+    
+            //     }
+            // }
             aDone = true;
             TryAnotherDispatch();
         });
@@ -390,10 +388,12 @@ public class WFC : MonoBehaviour
         currentNode.chunkIndex = -1;
         if(currentNode.NodeInfo.possibleTiles == 0)
         {
-            Debug.Log(currentNode.NodeInfo.x + " " + currentNode.NodeInfo.y);
+            Debug.Log("Error At: " + currentNode.NodeInfo.x + " " + currentNode.NodeInfo.y);
             EndIt();
         }
 
+        if(test == 3)
+            Debug.Log("collapsing: " + currentNode.NodeInfo.x + " " + currentNode.NodeInfo.y + " " + Convert.ToString(currentNode.NodeInfo.possibleTiles, 2).PadLeft(8, '0') + " " + Convert.ToString(currentNode.NodeInfo.tile).PadLeft(8, '0'));
         currentNode.Collapse();
 
         NodeInfo currentNodeInfo = currentNode.NodeInfo;
@@ -448,7 +448,7 @@ public class WFC : MonoBehaviour
             Collapse();
             return;
         }
-
+        test++;
         for (int i = heaps.Length - 1; i >= 0; i--)
         {
             Heap heap = heaps[i];
@@ -473,13 +473,12 @@ public class WFC : MonoBehaviour
                 for (int y = startY; y < startY + subChunkSize; y++)
                 {
                     Node node = grid[x, y];
-                    if (node.NodeInfo.tile != 0)
-                    {
-                        node.Reset();
-                        gridCurrent[x * NodesAmountY + y] = node.NodeInfo;
-                    }
+                    node.Reset();
                     node.chunkIndex = i;
                     heap.Add(node);
+                    gridCurrent[x * NodesAmountY + y] = node.NodeInfo;
+                    // Debug.Log(node.NodeInfo.x + " " + node.NodeInfo.y + " " + node.NodeInfo.tile);
+                    // Debug.Log(i + " " + node.NodeInfo.x + " " + node.NodeInfo.y + " " + Convert.ToString(node.NodeInfo.possibleTiles, 2).PadLeft(8, '0'));
                 }
             }
             heap.directionsIndex++;
@@ -496,6 +495,8 @@ public class WFC : MonoBehaviour
             return;
         }
 
+        gridCurrentBuff.SetData(gridCurrent);
+
         Dispatch();
     }
 
@@ -509,7 +510,8 @@ public class WFC : MonoBehaviour
             if ((tileBit & (1 << i)) != 0)
             {
                 GameObject tileObj = tiles[i].tile;
-                Instantiate(tileObj, node.nodePos, Quaternion.identity);
+                GameObject inst = Instantiate(tileObj, node.nodePos, Quaternion.identity);
+                inst.name = node.NodeInfo.x + " " + node.NodeInfo.y;
                 break;
             }
         }

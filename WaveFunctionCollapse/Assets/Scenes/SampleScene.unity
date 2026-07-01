@@ -1641,9 +1641,9 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 69c90e0d8130fdc44ac127c9c4d23798, type: 2}
   - {fileID: 11400000, guid: 72760ceac3c87514390ccf5d7ba36336, type: 2}
   - {fileID: 11400000, guid: 1b134f636a837c2469fc6ebd8839436b, type: 2}
-  gridSizeX: 40
-  gridSizeY: 40
-  subChunkSize: 16
+  gridSizeX: 30
+  gridSizeY: 30
+  subChunkSize: 11
   edgeLength: 4
   timeToGenerate: 0
 --- !u!1 &1793021055
