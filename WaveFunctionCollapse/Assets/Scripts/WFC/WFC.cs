@@ -8,11 +8,6 @@ using UnityEngine.Rendering;
 
 public class WFC : MonoBehaviour
 {
-    //Profiling
-    // static readonly ProfilerMarker CollapseMarker = new("Collapse Marker");
-    // static readonly ProfilerMarker DispatchMarker = new("Dispatch Marker");
-    // static readonly ProfilerMarker UpdateInfMarker = new("UpdateInfo Marker");
-
 
     [SerializeField] ComputeShader NodeRelaxation;
     int kernelIndex;
@@ -67,13 +62,6 @@ public class WFC : MonoBehaviour
         new(-1, 0)
     };
 
-    // void Start()
-    // {
-    //     int a = 1;
-    //     int b = a << 1;
-    //     UnityEngine.Debug.Log(b);
-    // }
-
     void Awake()
     {
         GetTilesCompat();
@@ -117,7 +105,6 @@ public class WFC : MonoBehaviour
                     if(tile.GetSocket(d) == compTile.GetSocket((d + 2) % directions.Count))
                         compTiles |= (uint)(1 << j);
                 }
-
                 compat[i * 4 + d] = compTiles;
             }
         }
@@ -192,7 +179,7 @@ public class WFC : MonoBehaviour
                 float xPos = nodeRadius + NodeDiameter * x;
                 float yPos = nodeRadius + NodeDiameter * y;
                 Vector2 nodePos = new Vector2(xPos, yPos) + bottomLeft;
-                NodeInfo nodeInfo = new(x, y, 0b11111111);
+                NodeInfo nodeInfo = new(x, y, 0b111111111111);
 
                 if(x == 0 || x == NodesAmountX - 1 || y == 0 || y == NodesAmountY - 1)
                 {
@@ -290,8 +277,6 @@ public class WFC : MonoBehaviour
                 continue;
 
             NodeInfo updatedInfo = gridNext[i];
-            if(test == 3)
-                Debug.Log(nodeInfo.x + " " + nodeInfo.y + " " + Convert.ToString(nodeInfo.possibleTiles, 2).PadLeft(8, '0') + " " + Convert.ToString(updatedInfo.possibleTiles, 2).PadLeft(8, '0') + " " + Convert.ToString(node.NodeInfo.possibleTiles, 2).PadLeft(8, '0') + " " + node.chunkIndex);
 
             if(nodeInfo.possibleTiles == updatedInfo.possibleTiles)
                 continue;
@@ -315,19 +300,6 @@ public class WFC : MonoBehaviour
             if(request.hasError)
                 return;
             gridNext = request.GetData<NodeInfo>().ToArray();
-            // if (test)
-            // {
-            //     for (int i = 0; i < gridNext.Length; i++)
-            //     {
-            //         NodeInfo old = gridCurrent[i];
-            //         if(old.tile != 0)
-            //             continue;
-    
-            //         NodeInfo newInfo = gridNext[i];
-            //         Debug.Log(old.x + " " + old.y + " " + Convert.ToString(old.possibleTiles, 2).PadLeft(8, '0') + " " + Convert.ToString(newInfo.possibleTiles, 2).PadLeft(8, '0'));
-    
-            //     }
-            // }
             aDone = true;
             TryAnotherDispatch();
         });
@@ -391,9 +363,6 @@ public class WFC : MonoBehaviour
             Debug.Log("Error At: " + currentNode.NodeInfo.x + " " + currentNode.NodeInfo.y);
             EndIt();
         }
-
-        if(test == 3)
-            Debug.Log("collapsing: " + currentNode.NodeInfo.x + " " + currentNode.NodeInfo.y + " " + Convert.ToString(currentNode.NodeInfo.possibleTiles, 2).PadLeft(8, '0') + " " + Convert.ToString(currentNode.NodeInfo.tile).PadLeft(8, '0'));
         currentNode.Collapse();
 
         NodeInfo currentNodeInfo = currentNode.NodeInfo;
@@ -477,8 +446,6 @@ public class WFC : MonoBehaviour
                     node.chunkIndex = i;
                     heap.Add(node);
                     gridCurrent[x * NodesAmountY + y] = node.NodeInfo;
-                    // Debug.Log(node.NodeInfo.x + " " + node.NodeInfo.y + " " + node.NodeInfo.tile);
-                    // Debug.Log(i + " " + node.NodeInfo.x + " " + node.NodeInfo.y + " " + Convert.ToString(node.NodeInfo.possibleTiles, 2).PadLeft(8, '0'));
                 }
             }
             heap.directionsIndex++;
@@ -511,7 +478,7 @@ public class WFC : MonoBehaviour
             {
                 GameObject tileObj = tiles[i].tile;
                 GameObject inst = Instantiate(tileObj, node.nodePos, Quaternion.identity);
-                inst.name = node.NodeInfo.x + " " + node.NodeInfo.y;
+                // inst.name = node.NodeInfo.x + " " + node.NodeInfo.y;
                 break;
             }
         }

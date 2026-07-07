@@ -17,7 +17,7 @@ public struct NodeInfo
         this.possibleTiles = possibleTiles;
         entropy = 0;
 
-        for (int i = 0; i < 8; i++)
+        for (int i = 0; i < 12; i++)
         {
             if((possibleTiles & 1 << i) != 0)
                 entropy++;
@@ -54,10 +54,10 @@ public class Node
             return;
         }
 
-        int[] positions = new int[8];
+        int[] positions = new int[12];
         int count = 0;
 
-        for (int i = 0; i < 8; i++)
+        for (int i = 0; i < 12; i++)
         {
             if((nodeInfo.possibleTiles & 1 << i) != 0)
             {

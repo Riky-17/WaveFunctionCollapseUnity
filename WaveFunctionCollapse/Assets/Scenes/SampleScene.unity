@@ -1641,9 +1641,13 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 69c90e0d8130fdc44ac127c9c4d23798, type: 2}
   - {fileID: 11400000, guid: 72760ceac3c87514390ccf5d7ba36336, type: 2}
   - {fileID: 11400000, guid: 1b134f636a837c2469fc6ebd8839436b, type: 2}
-  gridSizeX: 30
-  gridSizeY: 30
-  subChunkSize: 11
+  - {fileID: 11400000, guid: af469d885631c4548ab3e183af76f7ec, type: 2}
+  - {fileID: 11400000, guid: 897b9f32edd9a8a4ab3bb063c925aeb5, type: 2}
+  - {fileID: 11400000, guid: 382499768e0a0f2429d967083943f3a0, type: 2}
+  - {fileID: 11400000, guid: 534d2f828cf8dbb44b1bd2fbaee10ee0, type: 2}
+  gridSizeX: 46
+  gridSizeY: 46
+  subChunkSize: 16
   edgeLength: 4
   timeToGenerate: 0
 --- !u!1 &1793021055
