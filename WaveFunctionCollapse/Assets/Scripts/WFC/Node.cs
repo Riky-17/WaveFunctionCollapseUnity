@@ -9,6 +9,7 @@ public struct NodeInfo
     public uint tile;
     public int x;
     public int y;
+    public int test;
 
     public NodeInfo(int x, int y, uint possibleTiles)
     {
@@ -24,6 +25,7 @@ public struct NodeInfo
         }
 
         tile = 0;
+        test = 0;
     }
 }
 
