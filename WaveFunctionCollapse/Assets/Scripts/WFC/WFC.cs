@@ -14,25 +14,33 @@ public struct ProgressData
 public struct Chunk
 {
     public Vector2Int startCoord;
-    public int edgeSize;
+    public int edgeSizeX;
+    public int edgeSizeY;
     Vector2Int[] passDirections;
     public int passIndex;
+    public int chunkSizeX;
+    public int chunkSizeY;
 
-    public Chunk(Vector2Int startCoord, int edgeSize, Vector2Int[] passDirections)
+    public Chunk(Vector2Int startCoord, int chunkSize, int edgeSize, Vector2Int[] passDirections) : this(startCoord, chunkSize, chunkSize, edgeSize, edgeSize, passDirections) {}
+
+    public Chunk(Vector2Int startCoord, int chunkSizeX, int chunkSizeY, int edgeSizeX, int edgeSizeY, Vector2Int[] passDirections)
     {
         this.startCoord = startCoord;
-        this.edgeSize = edgeSize;
+        this.chunkSizeX = chunkSizeX;
+        this.chunkSizeY = chunkSizeY;
+        this.edgeSizeX = edgeSizeX;
+        this.edgeSizeY = edgeSizeY;
         this.passDirections = passDirections;
         passIndex = 0;
     }
 
     public bool UpdatePass()
     {
-        if(passIndex >= passDirections.Length)
+        if(passDirections == null || passIndex >= passDirections.Length)
             return false;
 
         Vector2Int passDirection = passDirections[passIndex];
-        startCoord = new(startCoord.x + (edgeSize * passDirection.x), startCoord.y + (edgeSize * passDirection.y));
+        startCoord = new(startCoord.x + (edgeSizeX * passDirection.x), startCoord.y + (edgeSizeY * passDirection.y));
         passIndex++;
         return true;
     }
@@ -60,7 +68,7 @@ public class WFC : MonoBehaviour
     NodeInfo[] gridCurrent;
     NodeInfo[] gridNext;
     NodeInfo[] collapsedNodes;
-    ProgressData[] progress;
+    ProgressData[] progressData;
     int[] dispatchCounter;
 
     const int SubChunkSize = 16;
@@ -78,9 +86,9 @@ public class WFC : MonoBehaviour
     Vector2Int[] startCoords;
     Vector2Int[] PassDirections = new Vector2Int[3]
     {
-      new Vector2Int(0, 1),
-      new Vector2Int(1, 0),
-      new Vector2Int(0, -1),
+      new(0, 1),
+      new(1, 0),
+      new(0, -1),
     };
 
     ComputeBuffer startCoordsBuff;
@@ -98,6 +106,11 @@ public class WFC : MonoBehaviour
     int dispatchIterations = 32;
 
     public float timeToGenerate;
+
+    float collapsedNodesCount = 0;
+
+    float progress = 0;
+    int maxNodesToCollapse;
 
     Stopwatch sw;
 
@@ -162,7 +175,6 @@ public class WFC : MonoBehaviour
 
     void CreateGrid()
     {
-
         int chunksAmountX = NodesAmountX / TotalChunkSize;
         int chunksAmountY = NodesAmountY / TotalChunkSize;
 
@@ -178,54 +190,66 @@ public class WFC : MonoBehaviour
         startCoords = new Vector2Int[totalChunksX * totalChunksY];
         chunks = new();
 
+        int edgeSizeExtraY = Mathf.Max(0, leftoverY - SubChunkSize);
+        int edgeSizeExtraX = Mathf.Max(0, leftoverX - SubChunkSize);
+
+        Vector2Int[] extraPassDirectionY = edgeSizeExtraY > 0 ? PassDirections : new Vector2Int[1] { new (1, 0) };
+        Vector2Int[] extraPassDirectionX = edgeSizeExtraX > 0 ? PassDirections : new Vector2Int[1] { new (0, 1) };
+        Vector2Int[] extraPassDirectionFinalChunk = new Vector2Int[0];
+
+        if(edgeSizeExtraX > 0 && edgeSizeExtraY > 0)
+            extraPassDirectionFinalChunk = PassDirections;
+        else if(edgeSizeExtraX > 0)
+            extraPassDirectionFinalChunk = new Vector2Int[1] { new (1, 0) };
+        else if(edgeSizeExtraY > 0)
+            extraPassDirectionFinalChunk = new Vector2Int[1] { new (0, 1) };
+
+        int normalNodesToCollapse = chunksAmountX * chunksAmountY * SubChunkSize * SubChunkSize * 4;
+
+        int minExtraX = Mathf.Min(leftoverX, SubChunkSize);
+        int minExtraY = Mathf.Min(leftoverY, SubChunkSize);
+
+        int extraNodesToCOllapseX = extraChunkX * chunksAmountY * minExtraX * SubChunkSize * (extraPassDirectionX.Length + 1);
+        int extraNodesToCollapseY = chunksAmountX * extraChunkY * SubChunkSize * minExtraY * (extraPassDirectionY.Length + 1);
+        int extraNodesToCollapseFinalChunk = extraChunkX * extraChunkY * minExtraX * minExtraY * (extraPassDirectionFinalChunk.Length + 1);
+
+        maxNodesToCollapse = normalNodesToCollapse + extraNodesToCOllapseX + extraNodesToCollapseY + extraNodesToCollapseFinalChunk;
+
         for (int x = 0; x < chunksAmountX; x++)
         {
             for (int y = 0; y < chunksAmountY; y++)
             {
                 Vector2Int startCoord = new(x * TotalChunkSize, y * TotalChunkSize);
-                Chunk chunk = new(startCoord, edgeSize, PassDirections);
+                Chunk chunk = new(startCoord, SubChunkSize, edgeSize, PassDirections);
                 chunks.Add(chunk);
                 startCoords[x * totalChunksY + y] = startCoord;
             }
+
+            if(extraChunkY > 0)
+            {
+                Vector2Int startCoord = new(x * TotalChunkSize, chunksAmountY * TotalChunkSize);
+                chunks.Add(new(startCoord, SubChunkSize, Mathf.Min(leftoverY, SubChunkSize), edgeSize, edgeSizeExtraY, extraPassDirectionY));
+                startCoords[x * totalChunksY + chunksAmountY] = startCoord;
+            }
         }
 
-        // Vector2Int[] chunksDirections = new Vector2Int[]
-        // {
-        //     new(0, 1),
-        //     new(1, 0),
-        //     new(0, -1)
-        // };
+        if(extraChunkX > 0)
+        {
+            for (int y = 0; y < chunksAmountY; y++)
+            {
+                Vector2Int startCoord = new(chunksAmountX * TotalChunkSize, y * TotalChunkSize);
+                chunks.Add(new(startCoord, Mathf.Min(leftoverX, SubChunkSize), SubChunkSize, edgeSizeExtraX, edgeSize, extraPassDirectionX));
+                startCoords[chunksAmountX * totalChunksY + y] = startCoord;
+            }
+        }
 
-        // Vector2Int startCoord;
+        if(extraChunkX > 0 && extraChunkY > 0)
+        {
+            Vector2Int startCoord = new(chunksAmountX * TotalChunkSize, chunksAmountY * TotalChunkSize);
 
-        // for (int x = 0; x < chunksAmountX; x++)
-        // {
-        //     for (int y = 0; y < chunksAmountY; y++)
-        //     {
-        //         startCoord = new(x * TotalChunkSize, y * TotalChunkSize);
-        //         heaps[x * totalChunksY + y] = new(SubChunkSize * SubChunkSize, chunksDirections, startCoord);
-        //     }
-
-        //     if (extraChunkY > 0)
-        //     {
-        //         startCoord = new(x * TotalChunkSize, chunksAmountY * TotalChunkSize);
-        //         heaps[x * totalChunksY + totalChunksY - 1] = new(leftoverY * SubChunkSize, new Vector2Int[] { new(1, 0) }, startCoord);
-        //     }
-        // }
-
-        // if(extraChunkX > 0)
-        // {
-        //     for (int y = 0; y < chunksAmountY; y++)
-        //     {
-        //         startCoord = new(chunksAmountX * TotalChunkSize, y * TotalChunkSize);
-        //         heaps[(totalChunksX - 1) * totalChunksY + y] = new(leftoverX * SubChunkSize, new Vector2Int[] { new(0, 1) }, startCoord);
-        //     }
-        // }
-
-        // if (extraChunkX > 0 && extraChunkY > 0)
-        // {
-        //     heaps[^1] = new(leftoverX * leftoverY);
-        // }
+            chunks.Add(new(startCoord, Mathf.Min(leftoverX, SubChunkSize), Mathf.Min(leftoverY, SubChunkSize), edgeSizeExtraX, edgeSizeExtraY, extraPassDirectionFinalChunk));
+            startCoords[^1] = startCoord;
+        }
 
         int totalNodes = NodesAmountX * NodesAmountY;
 
@@ -339,9 +363,9 @@ public class WFC : MonoBehaviour
 
         NodeRelaxation.SetInt("seed", UnityEngine.Random.Range(0, 300000));
 
-        progress = new ProgressData[1];
-        progressDataBuff = new(progress.Length, sizeof(int) * 2);
-        progressDataBuff.SetData(progress);
+        progressData = new ProgressData[totalChunksX * totalChunksY];
+        progressDataBuff = new(progressData.Length, sizeof(int) * 2);
+        progressDataBuff.SetData(progressData);
         NodeRelaxation.SetBuffer(collapseKernel, "progressData", progressDataBuff);
         NodeRelaxation.SetBuffer(gridDoneKernel, "progressData", progressDataBuff);
     }
@@ -375,7 +399,7 @@ public class WFC : MonoBehaviour
                 Debug.LogError("Error");
 
             progressBuffDone = true;
-            progressDataBuff.GetData(progress);
+            progressDataBuff.GetData(progressData);
             TryAnotherDispatch();
         });
 
@@ -397,28 +421,22 @@ public class WFC : MonoBehaviour
 
         progressBuffDone = false;
         collapsedBuffDone = false;
-        // if(chunks[0].passIndex == 1)
-        //     Debug.Log(progress[0].collapsedNodes);
 
         foreach(NodeInfo nodeInfo in collapsedNodes)
         {
             if(nodeInfo.entropy < 1)
                 continue;
 
-            // if(nodeInfo.x == 0 && nodeInfo.y == 25)
-            //     Debug.Log("Hello");
-            // Debug.Log(nodeInfo.x + " " + nodeInfo.y + " " + nodeInfo.test);
-
             grid[nodeInfo.x, nodeInfo.y].UpdateInfo(nodeInfo);
             gridCurrent[nodeInfo.x * NodesAmountY + nodeInfo.y] = nodeInfo;
         }
 
-        if(progress[0].doneFlag == 0)
+        if(CheckProgress())
             UpdatePass();
         else
         {
-            progress[0] = new();
-            progressDataBuff.SetData(progress);
+            progressData = new ProgressData[totalChunksX * totalChunksY];
+            progressDataBuff.SetData(progressData);
             NodeRelaxation.SetBuffer(collapseKernel, "progressData", progressDataBuff);
             NodeRelaxation.SetBuffer(gridDoneKernel, "progressData", progressDataBuff);
             dispatchCounter[0] = 0;
@@ -426,6 +444,20 @@ public class WFC : MonoBehaviour
             NodeRelaxation.SetBuffer(collapseKernel, "dispatchCounter", dispatchCounterBuff);
             WaveFunctionCollapseIteration();
         }
+    }
+
+    bool CheckProgress()
+    {
+        bool flag = true;
+        for (int i = 0; i < progressData.Length; i++)
+        {
+            collapsedNodesCount += progressData[i].collapsedNodes;
+            if(progressData[i].doneFlag == 1)
+                flag = false;
+        }
+        progress = collapsedNodesCount / maxNodesToCollapse;
+        Debug.Log((int)(progress * 100) + "%");
+        return flag;
     }
 
     void UpdatePass()
@@ -442,17 +474,14 @@ public class WFC : MonoBehaviour
             done = false;
             Vector2Int startCoord = chunk.startCoord;
             startCoords[i] = startCoord;
-            // Debug.Log(startCoord);
-            for (int x = startCoord.x; x < startCoord.x + SubChunkSize; x++)
+            for (int x = startCoord.x; x < startCoord.x + chunk.chunkSizeX; x++)
             {
-                for (int y = startCoord.y; y < startCoord.y + SubChunkSize; y++)
+                for (int y = startCoord.y; y < startCoord.y + chunk.chunkSizeY; y++)
                 {
                     int index = x * NodesAmountY + y;
                     Node node = grid[x, y];
                     node.Reset();
                     
-                    // if(node.NodeInfo.x == 0 && node.NodeInfo.y == 25)
-                    //     Debug.Log("Hello");
                     gridCurrent[index] = node.NodeInfo;
                 }
             }
@@ -474,8 +503,8 @@ public class WFC : MonoBehaviour
         NodeRelaxation.SetBuffer(collapseKernel, "startCoords", startCoordsBuff);
         NodeRelaxation.SetBuffer(gridDoneKernel, "startCoords", startCoordsBuff);
         
-        progress[0] = new();
-        progressDataBuff.SetData(progress);
+        progressData = new ProgressData[totalChunksX * totalChunksY];
+        progressDataBuff.SetData(progressData);
         NodeRelaxation.SetBuffer(collapseKernel, "progressData", progressDataBuff);
         NodeRelaxation.SetBuffer(gridDoneKernel, "progressData", progressDataBuff);
         dispatchCounter[0] = 0;

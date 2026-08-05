@@ -1656,8 +1656,8 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 897b9f32edd9a8a4ab3bb063c925aeb5, type: 2}
   - {fileID: 11400000, guid: 382499768e0a0f2429d967083943f3a0, type: 2}
   - {fileID: 11400000, guid: 534d2f828cf8dbb44b1bd2fbaee10ee0, type: 2}
-  gridSizeX: 40
-  gridSizeY: 40
+  gridSizeX: 21
+  gridSizeY: 21
   edgeSize: 4
   timeToGenerate: 0
 --- !u!1 &1793021055
