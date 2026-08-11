@@ -51,9 +51,9 @@ public class WFC : MonoBehaviour
 
     [SerializeField] ComputeShader NodeRelaxation;
 
-    //grid fields
     [SerializeField] List<TileWFC> tiles;
 
+    List<GameObject> createdTiles = new();
 
     float nodeRadius = .5f;
     float NodeDiameter => nodeRadius * 2;
@@ -105,14 +105,15 @@ public class WFC : MonoBehaviour
 
     int dispatchIterations = 32;
 
-    public float timeToGenerate;
-
     float collapsedNodesCount = 0;
 
-    float progress = 0;
+    int progress = 0;
     int maxNodesToCollapse;
 
     Stopwatch sw;
+
+    public event Action<float> OnGridDone;
+    public event Action<int> OnProgressUpdate;
 
     readonly List<Vector2Int> directions = new()
     {
@@ -127,20 +128,23 @@ public class WFC : MonoBehaviour
         GetTilesCompat();
     }
 
-    void OnDisable()
+    void OnDisable() => ReleaseBuffers();
+
+    public void DeleteGrid()
     {
-        startCoordsBuff?.Release();
-        gridCurrentBuff?.Release();
-        gridNextBuff?.Release();
-        compatBuff?.Release();
-        indexesToCollapseBuff?.Release();
-        progressDataBuff?.Release();
-        collapsedNodesBuff?.Release();
-        dispatchCounterBuff?.Release();
+        foreach (GameObject tile in createdTiles)
+            Destroy(tile);
+        
+        createdTiles.Clear();
+        collapsedNodesCount = 0;
+
     }
 
     public void WaveFunctionCollapse()
     {
+        if(createdTiles.Count > 0)
+            return;
+
         sw = new();
         sw.Start();
         GetTilesCompat();
@@ -455,8 +459,8 @@ public class WFC : MonoBehaviour
             if(progressData[i].doneFlag == 1)
                 flag = false;
         }
-        progress = collapsedNodesCount / maxNodesToCollapse;
-        Debug.Log((int)(progress * 100) + "%");
+        progress = (int)(collapsedNodesCount / maxNodesToCollapse * 100);
+        OnProgressUpdate?.Invoke(progress);
         return flag;
     }
 
@@ -489,7 +493,7 @@ public class WFC : MonoBehaviour
 
         if(done)
         {
-            EndIt();
+            EndAlgo();
             return;
         }
 
@@ -524,13 +528,18 @@ public class WFC : MonoBehaviour
         });
     }
 
-    void EndIt()
+    void EndAlgo()
     {
         foreach (Node node in grid)
         {
             if(node.NodeInfo.tile != 0)
                 CreateTile(node);
         }
+
+        
+        ReleaseBuffers();
+        sw.Stop();
+        OnGridDone?.Invoke(sw.ElapsedMilliseconds / 1000f);
     }
 
     public bool IsInRange(int x, int min, int max) => x >= min && x <= max;
@@ -545,9 +554,22 @@ public class WFC : MonoBehaviour
                 GameObject tileObj = tiles[i].tile;
                 GameObject inst = Instantiate(tileObj, node.nodePos, Quaternion.identity);
                 inst.name = node.NodeInfo.x + " " + node.NodeInfo.y;
+                createdTiles.Add(inst);
                 break;
             }
         }
+    }
+
+    void ReleaseBuffers()
+    {
+        startCoordsBuff?.Release();
+        gridCurrentBuff?.Release();
+        gridNextBuff?.Release();
+        compatBuff?.Release();
+        indexesToCollapseBuff?.Release();
+        progressDataBuff?.Release();
+        collapsedNodesBuff?.Release();
+        dispatchCounterBuff?.Release();
     }
 
     void OnDrawGizmos()

@@ -14,10 +14,15 @@ public class UIManager : MonoBehaviour
     [SerializeField] Slider ySizeSlider;
     [SerializeField] TextMeshProUGUI tilesAmountText;
     [SerializeField] Button generateButton;
+    [SerializeField] Button deleteGridButton;
     [SerializeField] TextMeshProUGUI timeToGenerate;
+    [SerializeField] TextMeshProUGUI progress;
 
     void Awake()
     {
+        wfc.OnGridDone += t => timeToGenerate.text = "Time to Generate:\r\n" + t + " seconds";
+        wfc.OnProgressUpdate += p => progress.text = "Progress:\r\n" + p + "%";
+
         xSizeSlider.value = wfc.gridSizeX;
         ySizeSlider.value = wfc.gridSizeY;
         UpdateUI();
@@ -34,10 +39,13 @@ public class UIManager : MonoBehaviour
             UpdateUI();
         });
 
-        generateButton.onClick.AddListener(() =>
+        generateButton.onClick.AddListener(wfc.WaveFunctionCollapse);
+
+        deleteGridButton.onClick.AddListener(() =>
         {
-            wfc.WaveFunctionCollapse();
-            timeToGenerate.text = "Time to Generate:\r\n" + wfc.timeToGenerate + " seconds";
+            wfc.DeleteGrid();
+            timeToGenerate.text = "Time to Generate:\r\n0 seconds";
+            progress.text = "Progress:\r\n0%";
         });
     }
 
