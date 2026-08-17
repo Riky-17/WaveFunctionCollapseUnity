@@ -127,7 +127,7 @@ int edgeSize;
 
 int seed;
 
-RWStructuredBuffer<int> dispatchCounter;
+int dispatchCounter;
 int dispatchIterations;
 
 uint Hash(uint x)
@@ -196,27 +196,27 @@ void Collapse(uint3 groupID : SV_GROUPID, uint3 groupThreadID : SV_GROUPTHREADID
         GroupMemoryBarrierWithGroupSync();
     }
 
-    if(localIndex == 0 && entropies[0].x <= tilesCount)
-    {
-        int nodeIndex = entropies[0].y;
-        Node node = gridCurrent[nodeIndex];
-        
-        uint possibleTiles = node.possibleTiles;
-        int entropy = node.entropy;
-        uint index = RandomIndex(groupSeed + dispatchCounter[0], entropy);
-        node.tile = FindIndexSetBit(possibleTiles, index);
-        node.possibleTiles = node.tile;
-        node.entropy = 1;
-        node.test = globalX;
-        collapsedNodes[groupIndex * dispatchIterations + dispatchCounter[0]] = node;
-        
-        gridCurrent[nodeIndex] = node;  
-        progressData[groupIndex].collapsedCount++;
-        
-        if(groupIndex == 0)
-            dispatchCounter[0]++;
-    }
+    if(localIndex != 0)
+        return;
+    
+    if(entropies[0].x > tilesCount)
+        return;
+    
 
+    int nodeIndex = entropies[0].y;
+    Node node = gridCurrent[nodeIndex];
+    
+    uint possibleTiles = node.possibleTiles;
+    entropy = node.entropy;
+    uint index = RandomIndex(groupSeed + dispatchCounter, entropy);
+    node.tile = FindIndexSetBit(possibleTiles, index);
+    node.possibleTiles = node.tile;
+    node.entropy = 1;
+    // node.test = index;
+    collapsedNodes[groupIndex * dispatchIterations + dispatchCounter] = node;
+    
+    gridCurrent[nodeIndex] = node;  
+    progressData[groupIndex].collapsedCount++;
 }
 
 [numthreads(1, 1, 1)]

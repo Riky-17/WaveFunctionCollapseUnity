@@ -5,56 +5,15 @@ using Debug = UnityEngine.Debug;
 using UnityEngine.Rendering;
 using System;
 
-public struct ProgressData
-{
-    public int doneFlag;
-    public int collapsedNodes;
-}
-
-public struct Chunk
-{
-    public Vector2Int startCoord;
-    public int edgeSizeX;
-    public int edgeSizeY;
-    Vector2Int[] passDirections;
-    public int passIndex;
-    public int chunkSizeX;
-    public int chunkSizeY;
-
-    public Chunk(Vector2Int startCoord, int chunkSize, int edgeSize, Vector2Int[] passDirections) : this(startCoord, chunkSize, chunkSize, edgeSize, edgeSize, passDirections) {}
-
-    public Chunk(Vector2Int startCoord, int chunkSizeX, int chunkSizeY, int edgeSizeX, int edgeSizeY, Vector2Int[] passDirections)
-    {
-        this.startCoord = startCoord;
-        this.chunkSizeX = chunkSizeX;
-        this.chunkSizeY = chunkSizeY;
-        this.edgeSizeX = edgeSizeX;
-        this.edgeSizeY = edgeSizeY;
-        this.passDirections = passDirections;
-        passIndex = 0;
-    }
-
-    public bool UpdatePass()
-    {
-        if(passDirections == null || passIndex >= passDirections.Length)
-            return false;
-
-        Vector2Int passDirection = passDirections[passIndex];
-        startCoord = new(startCoord.x + (edgeSizeX * passDirection.x), startCoord.y + (edgeSizeY * passDirection.y));
-        passIndex++;
-        return true;
-    }
-}
-
 public class WFC : MonoBehaviour
 {
-
     [SerializeField] ComputeShader NodeRelaxation;
 
     [SerializeField] List<TileWFC> tiles;
 
     List<GameObject> createdTiles = new();
 
+    // Grid Fields
     float nodeRadius = .5f;
     float NodeDiameter => nodeRadius * 2;
     public float gridSizeX = 70f;
@@ -62,21 +21,21 @@ public class WFC : MonoBehaviour
     public int NodesAmountX => Mathf.RoundToInt(gridSizeX / NodeDiameter);
     public int NodesAmountY => Mathf.RoundToInt(gridSizeY / NodeDiameter);
 
-    uint[] compat;
-
-    Node[,] grid;
-    NodeInfo[] gridCurrent;
-    NodeInfo[] gridNext;
-    NodeInfo[] collapsedNodes;
-    ProgressData[] progressData;
-    int[] dispatchCounter;
-
+    // Chunk Fields
     const int SubChunkSize = 16;
     [SerializeField] int edgeSize = 4;
     int TotalChunkSize => SubChunkSize + edgeSize;
     int totalChunksX;
     int totalChunksY;
 
+    // Algo Arrays
+    uint[] compat;
+    Node[,] grid;
+    NodeInfo[] gridCurrent;
+    NodeInfo[] collapsedNodes;
+    ProgressData[] progressData;
+
+    // Kernels
     int nodePropagationKernel;
     int collapseKernel;
     int updateGridKernel;
@@ -91,6 +50,7 @@ public class WFC : MonoBehaviour
       new(0, -1),
     };
 
+    // Buffers
     ComputeBuffer startCoordsBuff;
     ComputeBuffer gridCurrentBuff;
     ComputeBuffer gridNextBuff;
@@ -98,12 +58,11 @@ public class WFC : MonoBehaviour
     ComputeBuffer indexesToCollapseBuff;
     ComputeBuffer progressDataBuff;
     ComputeBuffer collapsedNodesBuff;
-    ComputeBuffer dispatchCounterBuff;
 
     bool progressBuffDone = false;
     bool collapsedBuffDone = false;
 
-    int dispatchIterations = 32;
+    int dispatchIterations = 16;
 
     float collapsedNodesCount = 0;
 
@@ -123,10 +82,7 @@ public class WFC : MonoBehaviour
         new(-1, 0)
     };
 
-    void Awake()
-    {
-        GetTilesCompat();
-    }
+    void Awake() => GetTilesCompat();
 
     void OnDisable() => ReleaseBuffers();
 
@@ -259,7 +215,6 @@ public class WFC : MonoBehaviour
 
         grid = new Node[NodesAmountX, NodesAmountY];
         gridCurrent = new NodeInfo[totalNodes];
-        gridNext = new NodeInfo[totalNodes];
         uint allTiles = 0;
 
         for (int i = 0; i < tiles.Count; i++)
@@ -333,8 +288,7 @@ public class WFC : MonoBehaviour
         NodeRelaxation.SetBuffer(updateGridKernel, "gridCurrent", gridCurrentBuff);
         NodeRelaxation.SetBuffer(gridDoneKernel, "gridCurrent", gridCurrentBuff);
 
-        gridNextBuff = new(gridNext.Length, nodeSize);
-        gridNextBuff.SetData(gridNext);
+        gridNextBuff = new(gridCurrent.Length, nodeSize);
         NodeRelaxation.SetBuffer(nodePropagationKernel, "gridNext", gridNextBuff);
         NodeRelaxation.SetBuffer(updateGridKernel, "gridNext", gridNextBuff);
 
@@ -344,11 +298,6 @@ public class WFC : MonoBehaviour
         collapsedNodesBuff = new(collapsedNodes.Length, nodeSize);
         collapsedNodesBuff.SetData(collapsedNodes);
         NodeRelaxation.SetBuffer(collapseKernel, "collapsedNodes", collapsedNodesBuff);
-
-        dispatchCounter = new int[1];
-        dispatchCounterBuff = new(dispatchCounter.Length, sizeof(int));
-        dispatchCounterBuff.SetData(dispatchCounter);
-        NodeRelaxation.SetBuffer(collapseKernel, "dispatchCounter", dispatchCounterBuff);
 
         compatBuff = new(compat.Length, sizeof(uint));
         compatBuff.SetData(compat);
@@ -390,6 +339,7 @@ public class WFC : MonoBehaviour
     {
         for (int i = 0; i < dispatchIterations; i++)
         {
+            NodeRelaxation.SetInt("dispatchCounter", i);
             NodeRelaxation.Dispatch(collapseKernel, totalChunksX, totalChunksY, 1);
             NodeRelaxation.Dispatch(nodePropagationKernel, NodesAmountX, NodesAmountY, 1);
             NodeRelaxation.Dispatch(updateGridKernel, NodesAmountX, NodesAmountY, 1);
@@ -413,7 +363,7 @@ public class WFC : MonoBehaviour
                 Debug.LogError("Error");
 
             collapsedBuffDone = true;
-            collapsedNodesBuff.GetData(collapsedNodes);
+            collapsedNodes = request.GetData<NodeInfo>().ToArray();
             TryAnotherDispatch(); 
         });
     }
@@ -428,11 +378,13 @@ public class WFC : MonoBehaviour
 
         foreach(NodeInfo nodeInfo in collapsedNodes)
         {
+            // Debug.Log(nodeInfo.x + " " + nodeInfo.y + " " + nodeInfo.test);
             if(nodeInfo.entropy < 1)
                 continue;
 
             grid[nodeInfo.x, nodeInfo.y].UpdateInfo(nodeInfo);
             gridCurrent[nodeInfo.x * NodesAmountY + nodeInfo.y] = nodeInfo;
+            collapsedNodesCount++;
         }
 
         if(CheckProgress())
@@ -443,9 +395,7 @@ public class WFC : MonoBehaviour
             progressDataBuff.SetData(progressData);
             NodeRelaxation.SetBuffer(collapseKernel, "progressData", progressDataBuff);
             NodeRelaxation.SetBuffer(gridDoneKernel, "progressData", progressDataBuff);
-            dispatchCounter[0] = 0;
-            dispatchCounterBuff.SetData(dispatchCounter);
-            NodeRelaxation.SetBuffer(collapseKernel, "dispatchCounter", dispatchCounterBuff);
+
             WaveFunctionCollapseIteration();
         }
     }
@@ -455,7 +405,7 @@ public class WFC : MonoBehaviour
         bool flag = true;
         for (int i = 0; i < progressData.Length; i++)
         {
-            collapsedNodesCount += progressData[i].collapsedNodes;
+            // collapsedNodesCount += progressData[i].collapsedNodes;
             if(progressData[i].doneFlag == 1)
                 flag = false;
         }
@@ -511,9 +461,6 @@ public class WFC : MonoBehaviour
         progressDataBuff.SetData(progressData);
         NodeRelaxation.SetBuffer(collapseKernel, "progressData", progressDataBuff);
         NodeRelaxation.SetBuffer(gridDoneKernel, "progressData", progressDataBuff);
-        dispatchCounter[0] = 0;
-        dispatchCounterBuff.SetData(dispatchCounter);
-        NodeRelaxation.SetBuffer(collapseKernel, "dispatchCounter", dispatchCounterBuff);
 
         NodeRelaxation.Dispatch(nodePropagationKernel, NodesAmountX, NodesAmountY, 1);
         NodeRelaxation.Dispatch(updateGridKernel, NodesAmountX, NodesAmountY, 1);
@@ -530,10 +477,18 @@ public class WFC : MonoBehaviour
 
     void EndAlgo()
     {
+        gridCurrentBuff.GetData(gridCurrent);
+        foreach (NodeInfo nodeInfo in gridCurrent)
+        {
+            Debug.Log(nodeInfo.x + " " + nodeInfo.y + " " + Convert.ToString(nodeInfo.tile, 2).PadLeft(12, '0') + " " + nodeInfo.test);
+        }
+        Debug.Log("--------------------");
         foreach (Node node in grid)
         {
             if(node.NodeInfo.tile != 0)
                 CreateTile(node);
+            else
+                Debug.Log(node.NodeInfo.entropy + " " + node.NodeInfo.x + " " + node.NodeInfo.y + " " + node.NodeInfo.possibleTiles + " " + node.NodeInfo.tile);
         }
 
         
@@ -569,7 +524,6 @@ public class WFC : MonoBehaviour
         indexesToCollapseBuff?.Release();
         progressDataBuff?.Release();
         collapsedNodesBuff?.Release();
-        dispatchCounterBuff?.Release();
     }
 
     void OnDrawGizmos()
