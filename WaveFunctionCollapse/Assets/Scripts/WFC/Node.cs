@@ -9,7 +9,6 @@ public struct NodeInfo
     public uint tile;
     public int x;
     public int y;
-    public int test;
 
     public NodeInfo(int x, int y, uint possibleTiles)
     {
@@ -25,7 +24,6 @@ public struct NodeInfo
         }
 
         tile = 0;
-        test = 0;
     }
 }
 
@@ -45,42 +43,7 @@ public class Node
         originalInfo = nodeInfo;
     }
 
-    public void Collapse()
-    {
-        if(nodeInfo.possibleTiles == 0)
-            throw new System.IndexOutOfRangeException();
-
-        if (nodeInfo.entropy == 1)
-        {
-            nodeInfo.tile = nodeInfo.possibleTiles;
-            return;
-        }
-
-        int[] positions = new int[12];
-        int count = 0;
-
-        for (int i = 0; i < 12; i++)
-        {
-            if((nodeInfo.possibleTiles & 1 << i) != 0)
-            {
-                positions[count] = i;
-                count++;
-            }
-        }
-        
-
-        nodeInfo.tile = (uint)(1 << positions[UnityEngine.Random.Range(0, count)]);
-        nodeInfo.possibleTiles = nodeInfo.tile;
-        nodeInfo.entropy = 1;
-    }
-
     public void Reset() => nodeInfo = originalInfo;
 
     public void UpdateInfo(NodeInfo nodeInfo) => this.nodeInfo = nodeInfo;
-
-    public int CompareTo(Node other)
-    {
-        int compare = nodeInfo.entropy.CompareTo(other.nodeInfo.entropy);
-        return -compare;
-    }
 }

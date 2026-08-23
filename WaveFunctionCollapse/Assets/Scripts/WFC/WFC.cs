@@ -1,13 +1,12 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using UnityEngine;
-using Debug = UnityEngine.Debug;
 using UnityEngine.Rendering;
 using System;
 
 public class WFC : MonoBehaviour
 {
-    [SerializeField] ComputeShader NodeRelaxation;
+    [SerializeField] ComputeShader computeShaderWFC;
 
     [SerializeField] List<TileWFC> tiles;
 
@@ -269,58 +268,58 @@ public class WFC : MonoBehaviour
 
     void InitComputeShader()
     {
-        nodePropagationKernel = NodeRelaxation.FindKernel("NodeRelaxation");
-        collapseKernel = NodeRelaxation.FindKernel("Collapse");
-        updateGridKernel = NodeRelaxation.FindKernel("UpdateGrid");
-        gridDoneKernel = NodeRelaxation.FindKernel("GridDone");
+        nodePropagationKernel = computeShaderWFC.FindKernel("NodeRelaxation");
+        collapseKernel = computeShaderWFC.FindKernel("Collapse");
+        updateGridKernel = computeShaderWFC.FindKernel("UpdateGrid");
+        gridDoneKernel = computeShaderWFC.FindKernel("GridDone");
 
-        var nodeSize = sizeof(uint) * 2 + sizeof(int) * 4;
+        var nodeSize = sizeof(uint) * 2 + sizeof(int) * 3;
 
         startCoordsBuff = new(startCoords.Length, sizeof(int) * 2);
         startCoordsBuff.SetData(startCoords);
-        NodeRelaxation.SetBuffer(collapseKernel, "startCoords", startCoordsBuff);
-        NodeRelaxation.SetBuffer(gridDoneKernel, "startCoords", startCoordsBuff);
+        computeShaderWFC.SetBuffer(collapseKernel, "startCoords", startCoordsBuff);
+        computeShaderWFC.SetBuffer(gridDoneKernel, "startCoords", startCoordsBuff);
 
         gridCurrentBuff = new(gridCurrent.Length, nodeSize);
         gridCurrentBuff.SetData(gridCurrent);
-        NodeRelaxation.SetBuffer(collapseKernel, "gridCurrent", gridCurrentBuff);
-        NodeRelaxation.SetBuffer(nodePropagationKernel, "gridCurrent", gridCurrentBuff);
-        NodeRelaxation.SetBuffer(updateGridKernel, "gridCurrent", gridCurrentBuff);
-        NodeRelaxation.SetBuffer(gridDoneKernel, "gridCurrent", gridCurrentBuff);
+        computeShaderWFC.SetBuffer(collapseKernel, "gridCurrent", gridCurrentBuff);
+        computeShaderWFC.SetBuffer(nodePropagationKernel, "gridCurrent", gridCurrentBuff);
+        computeShaderWFC.SetBuffer(updateGridKernel, "gridCurrent", gridCurrentBuff);
+        computeShaderWFC.SetBuffer(gridDoneKernel, "gridCurrent", gridCurrentBuff);
 
         gridNextBuff = new(gridCurrent.Length, nodeSize);
-        NodeRelaxation.SetBuffer(nodePropagationKernel, "gridNext", gridNextBuff);
-        NodeRelaxation.SetBuffer(updateGridKernel, "gridNext", gridNextBuff);
+        computeShaderWFC.SetBuffer(nodePropagationKernel, "gridNext", gridNextBuff);
+        computeShaderWFC.SetBuffer(updateGridKernel, "gridNext", gridNextBuff);
 
-        NodeRelaxation.SetInt("dispatchIterations", dispatchIterations);
+        computeShaderWFC.SetInt("dispatchIterations", dispatchIterations);
 
         collapsedNodes = new NodeInfo[totalChunksX * totalChunksY * dispatchIterations];
         collapsedNodesBuff = new(collapsedNodes.Length, nodeSize);
         collapsedNodesBuff.SetData(collapsedNodes);
-        NodeRelaxation.SetBuffer(collapseKernel, "collapsedNodes", collapsedNodesBuff);
+        computeShaderWFC.SetBuffer(collapseKernel, "collapsedNodes", collapsedNodesBuff);
 
         compatBuff = new(compat.Length, sizeof(uint));
         compatBuff.SetData(compat);
-        NodeRelaxation.SetBuffer(nodePropagationKernel, "compat", compatBuff);
+        computeShaderWFC.SetBuffer(nodePropagationKernel, "compat", compatBuff);
 
-        NodeRelaxation.SetInt("tilesCount", tiles.Count);
+        computeShaderWFC.SetInt("tilesCount", tiles.Count);
 
-        NodeRelaxation.SetInt("gridSizeX", NodesAmountX);
-        NodeRelaxation.SetInt("gridSizeY", NodesAmountY);
+        computeShaderWFC.SetInt("gridSizeX", NodesAmountX);
+        computeShaderWFC.SetInt("gridSizeY", NodesAmountY);
 
-        NodeRelaxation.SetInt("groupsAmountY", totalChunksY);
-        NodeRelaxation.SetInt("edgeSize", edgeSize);
+        computeShaderWFC.SetInt("groupsAmountY", totalChunksY);
+        computeShaderWFC.SetInt("edgeSize", edgeSize);
 
         indexesToCollapseBuff = new(totalChunksX * totalChunksY, sizeof(int));
-        NodeRelaxation.SetBuffer(collapseKernel, "indexesToCollapse", indexesToCollapseBuff);
+        computeShaderWFC.SetBuffer(collapseKernel, "indexesToCollapse", indexesToCollapseBuff);
 
-        NodeRelaxation.SetInt("seed", UnityEngine.Random.Range(0, 300000));
+        computeShaderWFC.SetInt("seed", UnityEngine.Random.Range(0, 300000));
 
         progressData = new ProgressData[totalChunksX * totalChunksY];
         progressDataBuff = new(progressData.Length, sizeof(int) * 2);
         progressDataBuff.SetData(progressData);
-        NodeRelaxation.SetBuffer(collapseKernel, "progressData", progressDataBuff);
-        NodeRelaxation.SetBuffer(gridDoneKernel, "progressData", progressDataBuff);
+        computeShaderWFC.SetBuffer(collapseKernel, "progressData", progressDataBuff);
+        computeShaderWFC.SetBuffer(gridDoneKernel, "progressData", progressDataBuff);
     }
 
     bool HasNeighbour(int dir, int x, int y)
@@ -339,18 +338,18 @@ public class WFC : MonoBehaviour
     {
         for (int i = 0; i < dispatchIterations; i++)
         {
-            NodeRelaxation.SetInt("dispatchCounter", i);
-            NodeRelaxation.Dispatch(collapseKernel, totalChunksX, totalChunksY, 1);
-            NodeRelaxation.Dispatch(nodePropagationKernel, NodesAmountX, NodesAmountY, 1);
-            NodeRelaxation.Dispatch(updateGridKernel, NodesAmountX, NodesAmountY, 1);
+            computeShaderWFC.SetInt("dispatchCounter", i);
+            computeShaderWFC.Dispatch(collapseKernel, totalChunksX, totalChunksY, 1);
+            computeShaderWFC.Dispatch(nodePropagationKernel, NodesAmountX, NodesAmountY, 1);
+            computeShaderWFC.Dispatch(updateGridKernel, NodesAmountX, NodesAmountY, 1);
         }
 
-        NodeRelaxation.Dispatch(gridDoneKernel, totalChunksX, totalChunksY, 1);
+        computeShaderWFC.Dispatch(gridDoneKernel, totalChunksX, totalChunksY, 1);
 
         AsyncGPUReadback.Request(progressDataBuff, request =>
         {
             if(request.hasError)
-                Debug.LogError("Error");
+                UnityEngine.Debug.LogError("Error");
 
             progressBuffDone = true;
             progressDataBuff.GetData(progressData);
@@ -360,7 +359,7 @@ public class WFC : MonoBehaviour
         AsyncGPUReadback.Request(collapsedNodesBuff, request =>
         {
             if(request.hasError)
-                Debug.LogError("Error");
+                UnityEngine.Debug.LogError("Error");
 
             collapsedBuffDone = true;
             collapsedNodes = request.GetData<NodeInfo>().ToArray();
@@ -378,13 +377,11 @@ public class WFC : MonoBehaviour
 
         foreach(NodeInfo nodeInfo in collapsedNodes)
         {
-            // Debug.Log(nodeInfo.x + " " + nodeInfo.y + " " + nodeInfo.test);
             if(nodeInfo.entropy < 1)
                 continue;
 
             grid[nodeInfo.x, nodeInfo.y].UpdateInfo(nodeInfo);
             gridCurrent[nodeInfo.x * NodesAmountY + nodeInfo.y] = nodeInfo;
-            collapsedNodesCount++;
         }
 
         if(CheckProgress())
@@ -393,8 +390,8 @@ public class WFC : MonoBehaviour
         {
             progressData = new ProgressData[totalChunksX * totalChunksY];
             progressDataBuff.SetData(progressData);
-            NodeRelaxation.SetBuffer(collapseKernel, "progressData", progressDataBuff);
-            NodeRelaxation.SetBuffer(gridDoneKernel, "progressData", progressDataBuff);
+            computeShaderWFC.SetBuffer(collapseKernel, "progressData", progressDataBuff);
+            computeShaderWFC.SetBuffer(gridDoneKernel, "progressData", progressDataBuff);
 
             WaveFunctionCollapseIteration();
         }
@@ -405,7 +402,7 @@ public class WFC : MonoBehaviour
         bool flag = true;
         for (int i = 0; i < progressData.Length; i++)
         {
-            // collapsedNodesCount += progressData[i].collapsedNodes;
+            collapsedNodesCount += progressData[i].collapsedNodes;
             if(progressData[i].doneFlag == 1)
                 flag = false;
         }
@@ -448,28 +445,28 @@ public class WFC : MonoBehaviour
         }
 
         gridCurrentBuff.SetData(gridCurrent);
-        NodeRelaxation.SetBuffer(collapseKernel, "gridCurrent", gridCurrentBuff);
-        NodeRelaxation.SetBuffer(nodePropagationKernel, "gridCurrent", gridCurrentBuff);
-        NodeRelaxation.SetBuffer(updateGridKernel, "gridCurrent", gridCurrentBuff);
-        NodeRelaxation.SetBuffer(gridDoneKernel, "gridCurrent", gridCurrentBuff);
+        computeShaderWFC.SetBuffer(collapseKernel, "gridCurrent", gridCurrentBuff);
+        computeShaderWFC.SetBuffer(nodePropagationKernel, "gridCurrent", gridCurrentBuff);
+        computeShaderWFC.SetBuffer(updateGridKernel, "gridCurrent", gridCurrentBuff);
+        computeShaderWFC.SetBuffer(gridDoneKernel, "gridCurrent", gridCurrentBuff);
 
         startCoordsBuff.SetData(startCoords);
-        NodeRelaxation.SetBuffer(collapseKernel, "startCoords", startCoordsBuff);
-        NodeRelaxation.SetBuffer(gridDoneKernel, "startCoords", startCoordsBuff);
+        computeShaderWFC.SetBuffer(collapseKernel, "startCoords", startCoordsBuff);
+        computeShaderWFC.SetBuffer(gridDoneKernel, "startCoords", startCoordsBuff);
         
         progressData = new ProgressData[totalChunksX * totalChunksY];
         progressDataBuff.SetData(progressData);
-        NodeRelaxation.SetBuffer(collapseKernel, "progressData", progressDataBuff);
-        NodeRelaxation.SetBuffer(gridDoneKernel, "progressData", progressDataBuff);
+        computeShaderWFC.SetBuffer(collapseKernel, "progressData", progressDataBuff);
+        computeShaderWFC.SetBuffer(gridDoneKernel, "progressData", progressDataBuff);
 
-        NodeRelaxation.Dispatch(nodePropagationKernel, NodesAmountX, NodesAmountY, 1);
-        NodeRelaxation.Dispatch(updateGridKernel, NodesAmountX, NodesAmountY, 1);
-        NodeRelaxation.Dispatch(nodePropagationKernel, NodesAmountX, NodesAmountY, 1);
-        NodeRelaxation.Dispatch(updateGridKernel, NodesAmountX, NodesAmountY, 1);
+        computeShaderWFC.Dispatch(nodePropagationKernel, NodesAmountX, NodesAmountY, 1);
+        computeShaderWFC.Dispatch(updateGridKernel, NodesAmountX, NodesAmountY, 1);
+        computeShaderWFC.Dispatch(nodePropagationKernel, NodesAmountX, NodesAmountY, 1);
+        computeShaderWFC.Dispatch(updateGridKernel, NodesAmountX, NodesAmountY, 1);
         AsyncGPUReadback.Request(gridCurrentBuff, request => 
         {
             if(request.hasError)
-                Debug.LogError("Error");
+                UnityEngine.Debug.LogError("Error");
             
             WaveFunctionCollapseIteration();
         });
@@ -477,18 +474,10 @@ public class WFC : MonoBehaviour
 
     void EndAlgo()
     {
-        gridCurrentBuff.GetData(gridCurrent);
-        foreach (NodeInfo nodeInfo in gridCurrent)
-        {
-            Debug.Log(nodeInfo.x + " " + nodeInfo.y + " " + Convert.ToString(nodeInfo.tile, 2).PadLeft(12, '0') + " " + nodeInfo.test);
-        }
-        Debug.Log("--------------------");
         foreach (Node node in grid)
         {
             if(node.NodeInfo.tile != 0)
                 CreateTile(node);
-            else
-                Debug.Log(node.NodeInfo.entropy + " " + node.NodeInfo.x + " " + node.NodeInfo.y + " " + node.NodeInfo.possibleTiles + " " + node.NodeInfo.tile);
         }
 
         

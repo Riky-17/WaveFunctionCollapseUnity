@@ -10,7 +10,6 @@ struct Node
     uint tile;
     int x;
     int y;
-    int test;
 };
 
 struct ProgressData
