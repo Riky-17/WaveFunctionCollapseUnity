@@ -1,38 +1,224 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using UnityEngine;
+using UnityEngine.Rendering;
+using System;
 
 public class WFC : MonoBehaviour
 {
-    //grid fields
+    [SerializeField] ComputeShader computeShaderWFC;
+
     [SerializeField] List<TileWFC> tiles;
 
+    List<GameObject> createdTiles = new();
+
+    // Grid Fields
     float nodeRadius = .5f;
     float NodeDiameter => nodeRadius * 2;
     public float gridSizeX = 70f;
     public float gridSizeY = 60f;
     public int NodesAmountX => Mathf.RoundToInt(gridSizeX / NodeDiameter);
     public int NodesAmountY => Mathf.RoundToInt(gridSizeY / NodeDiameter);
-    Node[,] grid;
-    public float timeToGenerate;
 
-    Heap<Node> nodesToCollapse;
-    readonly Stack<Node> nodesStack = new();
+    // Chunk Fields
+    const int SubChunkSize = 16;
+    [SerializeField] int edgeSize = 4;
+    int TotalChunkSize => SubChunkSize + edgeSize;
+    int totalChunksX;
+    int totalChunksY;
+
+    // Algo Arrays
+    uint[] compat;
+    Node[,] grid;
+    NodeInfo[] gridCurrent;
+    NodeInfo[] collapsedNodes;
+    ProgressData[] progressData;
+
+    // Kernels
+    int nodePropagationKernel;
+    int collapseKernel;
+    int updateGridKernel;
+    int gridDoneKernel;
+
+    List<Chunk> chunks;
+    Vector2Int[] startCoords;
+    Vector2Int[] PassDirections = new Vector2Int[3]
+    {
+      new(0, 1),
+      new(1, 0),
+      new(0, -1),
+    };
+
+    // Buffers
+    ComputeBuffer startCoordsBuff;
+    ComputeBuffer gridCurrentBuff;
+    ComputeBuffer gridNextBuff;
+    ComputeBuffer compatBuff;
+    ComputeBuffer indexesToCollapseBuff;
+    ComputeBuffer progressDataBuff;
+    ComputeBuffer collapsedNodesBuff;
+
+    bool progressBuffDone = false;
+    bool collapsedBuffDone = false;
+
+    int dispatchIterations = 16;
+
+    float collapsedNodesCount = 0;
+
+    int progress = 0;
+    int maxNodesToCollapse;
+
+    Stopwatch sw;
+
+    public event Action<float> OnGridDone;
+    public event Action<int> OnProgressUpdate;
+
+    readonly List<Vector2Int> directions = new()
+    {
+        new(0, 1),
+        new(1, 0),
+        new(0, -1),
+        new(-1, 0)
+    };
+
+    void Awake() => GetTilesCompat();
+
+    void OnDisable() => ReleaseBuffers();
+
+    public void DeleteGrid()
+    {
+        foreach (GameObject tile in createdTiles)
+            Destroy(tile);
+        
+        createdTiles.Clear();
+        collapsedNodesCount = 0;
+
+    }
 
     public void WaveFunctionCollapse()
     {
-        CreateGrid();
-        ConvertArrayToHeap();
-        Stopwatch sw = new();
+        if(createdTiles.Count > 0)
+            return;
+
+        sw = new();
         sw.Start();
-        StartWaveFunctionCollapse();
-        sw.Stop();
-        timeToGenerate = sw.ElapsedMilliseconds / 1000f;
+        GetTilesCompat();
+        CreateGrid();
+        InitComputeShader();
+        WaveFunctionCollapseIteration();
+    }
+
+    void GetTilesCompat()
+    {
+        compat = new uint[tiles.Count * 4];
+
+        for (int i = 0; i < tiles.Count; i++)
+        {
+            TileWFC tile = tiles[i];
+
+            for (int d = 0; d < directions.Count; d++)
+            {
+                uint compTiles = 0;
+
+                for (int j = 0; j < tiles.Count; j++)
+                {
+                    TileWFC compTile = tiles[j];
+
+                    if(tile.GetSocket(d) == compTile.GetSocket((d + 2) % directions.Count))
+                        compTiles |= (uint)(1 << j);
+                }
+                compat[i * 4 + d] = compTiles;
+            }
+        }
     }
 
     void CreateGrid()
     {
+        int chunksAmountX = NodesAmountX / TotalChunkSize;
+        int chunksAmountY = NodesAmountY / TotalChunkSize;
+
+        int leftoverX = NodesAmountX % TotalChunkSize;
+        int leftoverY = NodesAmountY % TotalChunkSize;
+
+        int extraChunkX = leftoverX != 0 ? 1 : 0;
+        int extraChunkY = leftoverY != 0 ? 1 : 0;
+
+        totalChunksX = chunksAmountX + extraChunkX;
+        totalChunksY = chunksAmountY + extraChunkY;
+
+        startCoords = new Vector2Int[totalChunksX * totalChunksY];
+        chunks = new();
+
+        int edgeSizeExtraY = Mathf.Max(0, leftoverY - SubChunkSize);
+        int edgeSizeExtraX = Mathf.Max(0, leftoverX - SubChunkSize);
+
+        Vector2Int[] extraPassDirectionY = edgeSizeExtraY > 0 ? PassDirections : new Vector2Int[1] { new (1, 0) };
+        Vector2Int[] extraPassDirectionX = edgeSizeExtraX > 0 ? PassDirections : new Vector2Int[1] { new (0, 1) };
+        Vector2Int[] extraPassDirectionFinalChunk = new Vector2Int[0];
+
+        if(edgeSizeExtraX > 0 && edgeSizeExtraY > 0)
+            extraPassDirectionFinalChunk = PassDirections;
+        else if(edgeSizeExtraX > 0)
+            extraPassDirectionFinalChunk = new Vector2Int[1] { new (1, 0) };
+        else if(edgeSizeExtraY > 0)
+            extraPassDirectionFinalChunk = new Vector2Int[1] { new (0, 1) };
+
+        int normalNodesToCollapse = chunksAmountX * chunksAmountY * SubChunkSize * SubChunkSize * 4;
+
+        int minExtraX = Mathf.Min(leftoverX, SubChunkSize);
+        int minExtraY = Mathf.Min(leftoverY, SubChunkSize);
+
+        int extraNodesToCOllapseX = extraChunkX * chunksAmountY * minExtraX * SubChunkSize * (extraPassDirectionX.Length + 1);
+        int extraNodesToCollapseY = chunksAmountX * extraChunkY * SubChunkSize * minExtraY * (extraPassDirectionY.Length + 1);
+        int extraNodesToCollapseFinalChunk = extraChunkX * extraChunkY * minExtraX * minExtraY * (extraPassDirectionFinalChunk.Length + 1);
+
+        maxNodesToCollapse = normalNodesToCollapse + extraNodesToCOllapseX + extraNodesToCollapseY + extraNodesToCollapseFinalChunk;
+
+        for (int x = 0; x < chunksAmountX; x++)
+        {
+            for (int y = 0; y < chunksAmountY; y++)
+            {
+                Vector2Int startCoord = new(x * TotalChunkSize, y * TotalChunkSize);
+                Chunk chunk = new(startCoord, SubChunkSize, edgeSize, PassDirections);
+                chunks.Add(chunk);
+                startCoords[x * totalChunksY + y] = startCoord;
+            }
+
+            if(extraChunkY > 0)
+            {
+                Vector2Int startCoord = new(x * TotalChunkSize, chunksAmountY * TotalChunkSize);
+                chunks.Add(new(startCoord, SubChunkSize, Mathf.Min(leftoverY, SubChunkSize), edgeSize, edgeSizeExtraY, extraPassDirectionY));
+                startCoords[x * totalChunksY + chunksAmountY] = startCoord;
+            }
+        }
+
+        if(extraChunkX > 0)
+        {
+            for (int y = 0; y < chunksAmountY; y++)
+            {
+                Vector2Int startCoord = new(chunksAmountX * TotalChunkSize, y * TotalChunkSize);
+                chunks.Add(new(startCoord, Mathf.Min(leftoverX, SubChunkSize), SubChunkSize, edgeSizeExtraX, edgeSize, extraPassDirectionX));
+                startCoords[chunksAmountX * totalChunksY + y] = startCoord;
+            }
+        }
+
+        if(extraChunkX > 0 && extraChunkY > 0)
+        {
+            Vector2Int startCoord = new(chunksAmountX * TotalChunkSize, chunksAmountY * TotalChunkSize);
+
+            chunks.Add(new(startCoord, Mathf.Min(leftoverX, SubChunkSize), Mathf.Min(leftoverY, SubChunkSize), edgeSizeExtraX, edgeSizeExtraY, extraPassDirectionFinalChunk));
+            startCoords[^1] = startCoord;
+        }
+
+        int totalNodes = NodesAmountX * NodesAmountY;
+
         grid = new Node[NodesAmountX, NodesAmountY];
+        gridCurrent = new NodeInfo[totalNodes];
+        uint allTiles = 0;
+
+        for (int i = 0; i < tiles.Count; i++)
+            allTiles |= (uint)(1 << i);
+
         Vector2 bottomLeft = new(-(gridSizeX / 2), -(gridSizeY / 2));
 
         for (int x = 0; x < NodesAmountX; x++)
@@ -42,157 +228,292 @@ public class WFC : MonoBehaviour
                 float xPos = nodeRadius + NodeDiameter * x;
                 float yPos = nodeRadius + NodeDiameter * y;
                 Vector2 nodePos = new Vector2(xPos, yPos) + bottomLeft;
-                Node node = new(nodePos, tiles, x, y);
+                NodeInfo nodeInfo = new(x, y, allTiles);
 
                 if(x == 0 || x == NodesAmountX - 1 || y == 0 || y == NodesAmountY - 1)
                 {
-                    for (int i = 0; i < 4; i++)
+                    for (int i = 0; i < directions.Count; i++)
                     {
-                        if (!TryGetNeighborFromDirection(i, node, out _))
+                        if (!HasNeighbour(i, x, y))
                         {
-                            foreach (TileWFC tile in tiles)
-                            {
-                                if(tile.GetSocket(i) > 0)
-                                node.possibleTiles.Remove(tile);
-                            }
-                            node.collapsedNeighbours++;
+                            uint compTiles = compat[2 * 4 + ((i + 2) % 4)];
+                            nodeInfo.possibleTiles &= compTiles;
                         }
                     }
+
+                    int entropy = 0;
+
+                    for (int i = 0; i < tiles.Count; i++)
+                        if((nodeInfo.possibleTiles & 1 << i) != 0)
+                            entropy++;
+
+                    nodeInfo.entropy = entropy;
                 }
+
+                Node node = new(nodePos, nodeInfo);
+
+                if(x % TotalChunkSize < SubChunkSize && y % TotalChunkSize < SubChunkSize)
+                {
+                    int chunkX = Mathf.FloorToInt(x / TotalChunkSize);
+                    int chunkY = Mathf.FloorToInt(y / TotalChunkSize);
+                    int chunkIndex = chunkX * (chunksAmountY + extraChunkY) + chunkY;
+                    node.chunkIndex = chunkIndex;
+                }
+
                 grid[x, y] = node;
+                gridCurrent[x * NodesAmountY + y] = nodeInfo;
             }
         }
     }
 
-    void ConvertArrayToHeap()
+    void InitComputeShader()
     {
-        int width = grid.GetLength(0);
-        int height = grid.GetLength(1);
-        nodesToCollapse = new(width * height);
-        for (int x = 0; x < width; x++)
+        nodePropagationKernel = computeShaderWFC.FindKernel("NodeRelaxation");
+        collapseKernel = computeShaderWFC.FindKernel("Collapse");
+        updateGridKernel = computeShaderWFC.FindKernel("UpdateGrid");
+        gridDoneKernel = computeShaderWFC.FindKernel("GridDone");
+
+        var nodeSize = sizeof(uint) * 2 + sizeof(int) * 3;
+
+        startCoordsBuff = new(startCoords.Length, sizeof(int) * 2);
+        startCoordsBuff.SetData(startCoords);
+        computeShaderWFC.SetBuffer(collapseKernel, "startCoords", startCoordsBuff);
+        computeShaderWFC.SetBuffer(gridDoneKernel, "startCoords", startCoordsBuff);
+
+        gridCurrentBuff = new(gridCurrent.Length, nodeSize);
+        gridCurrentBuff.SetData(gridCurrent);
+        computeShaderWFC.SetBuffer(collapseKernel, "gridCurrent", gridCurrentBuff);
+        computeShaderWFC.SetBuffer(nodePropagationKernel, "gridCurrent", gridCurrentBuff);
+        computeShaderWFC.SetBuffer(updateGridKernel, "gridCurrent", gridCurrentBuff);
+        computeShaderWFC.SetBuffer(gridDoneKernel, "gridCurrent", gridCurrentBuff);
+
+        gridNextBuff = new(gridCurrent.Length, nodeSize);
+        computeShaderWFC.SetBuffer(nodePropagationKernel, "gridNext", gridNextBuff);
+        computeShaderWFC.SetBuffer(updateGridKernel, "gridNext", gridNextBuff);
+
+        computeShaderWFC.SetInt("dispatchIterations", dispatchIterations);
+
+        collapsedNodes = new NodeInfo[totalChunksX * totalChunksY * dispatchIterations];
+        collapsedNodesBuff = new(collapsedNodes.Length, nodeSize);
+        collapsedNodesBuff.SetData(collapsedNodes);
+        computeShaderWFC.SetBuffer(collapseKernel, "collapsedNodes", collapsedNodesBuff);
+
+        compatBuff = new(compat.Length, sizeof(uint));
+        compatBuff.SetData(compat);
+        computeShaderWFC.SetBuffer(nodePropagationKernel, "compat", compatBuff);
+
+        computeShaderWFC.SetInt("tilesCount", tiles.Count);
+
+        computeShaderWFC.SetInt("gridSizeX", NodesAmountX);
+        computeShaderWFC.SetInt("gridSizeY", NodesAmountY);
+
+        computeShaderWFC.SetInt("groupsAmountY", totalChunksY);
+        computeShaderWFC.SetInt("edgeSize", edgeSize);
+
+        indexesToCollapseBuff = new(totalChunksX * totalChunksY, sizeof(int));
+        computeShaderWFC.SetBuffer(collapseKernel, "indexesToCollapse", indexesToCollapseBuff);
+
+        computeShaderWFC.SetInt("seed", UnityEngine.Random.Range(0, 300000));
+
+        progressData = new ProgressData[totalChunksX * totalChunksY];
+        progressDataBuff = new(progressData.Length, sizeof(int) * 2);
+        progressDataBuff.SetData(progressData);
+        computeShaderWFC.SetBuffer(collapseKernel, "progressData", progressDataBuff);
+        computeShaderWFC.SetBuffer(gridDoneKernel, "progressData", progressDataBuff);
+    }
+
+    bool HasNeighbour(int dir, int x, int y)
+    {
+        Vector2Int direction = directions[dir];
+        int neighbourX = x + direction.x;
+        int neighbourY = y + direction.y;
+
+        if(IsInRange(neighbourX, 0, NodesAmountX - 1) && IsInRange(neighbourY, 0, NodesAmountY - 1))
+            return true;
+
+        return false;
+    }
+
+    void WaveFunctionCollapseIteration()
+    {
+        for (int i = 0; i < dispatchIterations; i++)
         {
-            for (int y = 0; y < height; y++)
-            {
-                nodesToCollapse.Add(grid[x, y]);
-            }            
+            computeShaderWFC.SetInt("dispatchCounter", i);
+            computeShaderWFC.Dispatch(collapseKernel, totalChunksX, totalChunksY, 1);
+            computeShaderWFC.Dispatch(nodePropagationKernel, NodesAmountX, NodesAmountY, 1);
+            computeShaderWFC.Dispatch(updateGridKernel, NodesAmountX, NodesAmountY, 1);
+        }
+
+        computeShaderWFC.Dispatch(gridDoneKernel, totalChunksX, totalChunksY, 1);
+
+        AsyncGPUReadback.Request(progressDataBuff, request =>
+        {
+            if(request.hasError)
+                UnityEngine.Debug.LogError("Error");
+
+            progressBuffDone = true;
+            progressDataBuff.GetData(progressData);
+            TryAnotherDispatch();
+        });
+
+        AsyncGPUReadback.Request(collapsedNodesBuff, request =>
+        {
+            if(request.hasError)
+                UnityEngine.Debug.LogError("Error");
+
+            collapsedBuffDone = true;
+            collapsedNodes = request.GetData<NodeInfo>().ToArray();
+            TryAnotherDispatch(); 
+        });
+    }
+
+    void TryAnotherDispatch()
+    {
+        if (!progressBuffDone || !collapsedBuffDone)
+            return;
+
+        progressBuffDone = false;
+        collapsedBuffDone = false;
+
+        foreach(NodeInfo nodeInfo in collapsedNodes)
+        {
+            if(nodeInfo.entropy < 1)
+                continue;
+
+            grid[nodeInfo.x, nodeInfo.y].UpdateInfo(nodeInfo);
+            gridCurrent[nodeInfo.x * NodesAmountY + nodeInfo.y] = nodeInfo;
+        }
+
+        if(CheckProgress())
+            UpdatePass();
+        else
+        {
+            progressData = new ProgressData[totalChunksX * totalChunksY];
+            progressDataBuff.SetData(progressData);
+            computeShaderWFC.SetBuffer(collapseKernel, "progressData", progressDataBuff);
+            computeShaderWFC.SetBuffer(gridDoneKernel, "progressData", progressDataBuff);
+
+            WaveFunctionCollapseIteration();
         }
     }
 
-    bool TryGetNeighborFromDirection(int socketDir, Node currentNode, out Node neighbour)
+    bool CheckProgress()
     {
-        switch (socketDir)
+        bool flag = true;
+        for (int i = 0; i < progressData.Length; i++)
         {
-            case 0:
-                int up = currentNode.y + 1;
-                if(up >= NodesAmountY)
-                {
-                    neighbour = null;
-                    return false;
-                }
-                neighbour = grid[currentNode.x, up];
-                return true;
-            case 1:
-                int right = currentNode.x + 1;
-                if (right >= NodesAmountX)
-                {
-                    neighbour = null;
-                    return false;
-                }
-                neighbour = grid[right, currentNode.y];
-                return true;
-            case 2:
-                int down = currentNode.y - 1;
-                if(down < 0)
-                {
-                    neighbour = null;
-                    return false;
-                }
-                neighbour = grid[currentNode.x, down];
-                return true;
-            case 3:
-                int left = currentNode.x - 1;
-                if (left < 0)
-                {
-                    neighbour = null;
-                    return false;
-                }
-                neighbour = grid[left, currentNode.y];
-                return true;
-            default:
-                throw new System.ArgumentOutOfRangeException();
+            collapsedNodesCount += progressData[i].collapsedNodes;
+            if(progressData[i].doneFlag == 1)
+                flag = false;
         }
+        progress = (int)(collapsedNodesCount / maxNodesToCollapse * 100);
+        OnProgressUpdate?.Invoke(progress);
+        return flag;
     }
 
-    void StartWaveFunctionCollapse()
+    void UpdatePass()
     {
-        Node currentNode;
-
-        while(nodesToCollapse.HeapSize > 0)
+        bool done = true;
+        for (int i = 0; i < chunks.Count; i++)
         {
-            currentNode = nodesToCollapse.RemoveFirst();
+            Chunk chunk = chunks[i];
 
-            //set the tile of the current node
-            int tileIndex = currentNode.possibleTiles.Count > 1 ? Random.Range(0, currentNode.possibleTiles.Count) : 0;
-            currentNode.nodeTile = currentNode.possibleTiles[tileIndex];
-            currentNode.ReduceEntropy();
-            Instantiate(currentNode.nodeTile.Object, currentNode.nodePos, Quaternion.identity, transform);
+            if(!chunk.UpdatePass())
+                continue;
             
-            for (int i = 0; i < 4; i++)
+            chunks[i] = chunk;
+            done = false;
+            Vector2Int startCoord = chunk.startCoord;
+            startCoords[i] = startCoord;
+            for (int x = startCoord.x; x < startCoord.x + chunk.chunkSizeX; x++)
             {
-                if(TryGetNeighborFromDirection(i, currentNode, out Node neighbour))
-                    neighbour.collapsedNeighbours++;
+                for (int y = startCoord.y; y < startCoord.y + chunk.chunkSizeY; y++)
+                {
+                    int index = x * NodesAmountY + y;
+                    Node node = grid[x, y];
+                    node.Reset();
+                    
+                    gridCurrent[index] = node.NodeInfo;
+                }
             }
+        }
 
-            if(nodesToCollapse.HeapSize <= 0)
+        if(done)
+        {
+            EndAlgo();
+            return;
+        }
+
+        gridCurrentBuff.SetData(gridCurrent);
+        computeShaderWFC.SetBuffer(collapseKernel, "gridCurrent", gridCurrentBuff);
+        computeShaderWFC.SetBuffer(nodePropagationKernel, "gridCurrent", gridCurrentBuff);
+        computeShaderWFC.SetBuffer(updateGridKernel, "gridCurrent", gridCurrentBuff);
+        computeShaderWFC.SetBuffer(gridDoneKernel, "gridCurrent", gridCurrentBuff);
+
+        startCoordsBuff.SetData(startCoords);
+        computeShaderWFC.SetBuffer(collapseKernel, "startCoords", startCoordsBuff);
+        computeShaderWFC.SetBuffer(gridDoneKernel, "startCoords", startCoordsBuff);
+        
+        progressData = new ProgressData[totalChunksX * totalChunksY];
+        progressDataBuff.SetData(progressData);
+        computeShaderWFC.SetBuffer(collapseKernel, "progressData", progressDataBuff);
+        computeShaderWFC.SetBuffer(gridDoneKernel, "progressData", progressDataBuff);
+
+        computeShaderWFC.Dispatch(nodePropagationKernel, NodesAmountX, NodesAmountY, 1);
+        computeShaderWFC.Dispatch(updateGridKernel, NodesAmountX, NodesAmountY, 1);
+        computeShaderWFC.Dispatch(nodePropagationKernel, NodesAmountX, NodesAmountY, 1);
+        computeShaderWFC.Dispatch(updateGridKernel, NodesAmountX, NodesAmountY, 1);
+        AsyncGPUReadback.Request(gridCurrentBuff, request => 
+        {
+            if(request.hasError)
+                UnityEngine.Debug.LogError("Error");
+            
+            WaveFunctionCollapseIteration();
+        });
+    }
+
+    void EndAlgo()
+    {
+        foreach (Node node in grid)
+        {
+            if(node.NodeInfo.tile != 0)
+                CreateTile(node);
+        }
+
+        
+        ReleaseBuffers();
+        sw.Stop();
+        OnGridDone?.Invoke(sw.ElapsedMilliseconds / 1000f);
+    }
+
+    public bool IsInRange(int x, int min, int max) => x >= min && x <= max;
+
+    void CreateTile(Node node)
+    {
+        uint tileBit = node.NodeInfo.tile;
+        for (int i = 0; i < tiles.Count; i++)
+        {
+            if ((tileBit & (1 << i)) != 0)
+            {
+                GameObject tileObj = tiles[i].tile;
+                GameObject inst = Instantiate(tileObj, node.nodePos, Quaternion.identity);
+                inst.name = node.NodeInfo.x + " " + node.NodeInfo.y;
+                createdTiles.Add(inst);
                 break;
-
-            nodesStack.Push(currentNode);
-            
-            //Propagate the collapse to the neighbours
-            if(nodesStack.Count > 0)
-                PropagateCollapse();
-            
-        }
-    }
-
-    void PropagateCollapse()
-    {
-        List<int> possibleSockets = new();
-        List<TileWFC> neighbourTiles;
-        while(nodesStack.Count > 0)
-        {
-            Node currentNode = nodesStack.Pop();
-            for (int i = 0; i < 4; i++)
-            {
-                if(!TryGetNeighborFromDirection(i, currentNode, out Node neighbour) || neighbour.IsCollapsed)
-                    continue;
-                
-                foreach (TileWFC tile in currentNode.possibleTiles)
-                {
-                    if(!possibleSockets.Contains(tile.GetSocket(i)))
-                        possibleSockets.Add(tile.GetSocket(i));
-                }
-
-                neighbourTiles = new(neighbour.possibleTiles);
-                foreach (TileWFC tile in neighbourTiles)
-                {
-                    int neighbourSocket = tile.GetSocket(GetOppositeSide(i));
-                    if(!possibleSockets.Contains(neighbourSocket))
-                        neighbour.possibleTiles.Remove(tile);
-                }
-
-                if(neighbourTiles.Count != neighbour.possibleTiles.Count)
-                {
-                    nodesToCollapse.SortUp(neighbour);
-                    nodesStack.Push(neighbour);
-                }
-
-                possibleSockets.Clear();
             }
         }
     }
 
-    int GetOppositeSide(int side) => side + 2 < 4 ? side + 2 : side - 2;
+    void ReleaseBuffers()
+    {
+        startCoordsBuff?.Release();
+        gridCurrentBuff?.Release();
+        gridNextBuff?.Release();
+        compatBuff?.Release();
+        indexesToCollapseBuff?.Release();
+        progressDataBuff?.Release();
+        collapsedNodesBuff?.Release();
+    }
 
     void OnDrawGizmos()
     {

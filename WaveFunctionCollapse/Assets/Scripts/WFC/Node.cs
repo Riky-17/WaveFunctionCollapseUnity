@@ -1,41 +1,49 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class Node : IHeapItem<Node>
+public struct NodeInfo
 {
-    public List<TileWFC> possibleTiles;
-    public int Entropy => possibleTiles.Count;
-    public int collapsedNeighbours;
-    public TileWFC nodeTile;
-    public bool IsCollapsed => nodeTile != null;
-    int heapIndex;
-    public Vector2 nodePos;
+    public uint possibleTiles;
+    public int entropy;
+    public uint tile;
     public int x;
     public int y;
 
-    public Node(Vector2 pos, IEnumerable<TileWFC> tiles, int x, int y)
+    public NodeInfo(int x, int y, uint possibleTiles)
     {
-        nodePos = pos;
-        possibleTiles = new(tiles);
         this.x = x;
         this.y = y;
-    }
+        this.possibleTiles = possibleTiles;
+        entropy = 0;
 
-    public void ReduceEntropy()
+        for (int i = 0; i < 12; i++)
+        {
+            if((possibleTiles & 1 << i) != 0)
+                entropy++;
+        }
+
+        tile = 0;
+    }
+}
+
+public class Node
+{
+    public NodeInfo NodeInfo => nodeInfo;
+    NodeInfo nodeInfo;
+    NodeInfo originalInfo;
+    public Vector2 nodePos;
+    public int heapIndex;
+    public int chunkIndex = -1;
+
+    public Node(Vector2 pos, NodeInfo nodeInfo)
     {
-        List<TileWFC> possibleTilesDup = new(possibleTiles);
-        foreach (TileWFC tile in possibleTilesDup)
-            if(tile != nodeTile)
-                possibleTiles.Remove(tile);
+        nodePos = pos;
+        this.nodeInfo = nodeInfo;
+        originalInfo = nodeInfo;
     }
 
-    public int HeapIndex { get => heapIndex; set => heapIndex = value; }
+    public void Reset() => nodeInfo = originalInfo;
 
-    public int CompareTo(Node other)
-    {
-        int compare = Entropy.CompareTo(other.Entropy);
-        if(compare == 0)
-            return collapsedNeighbours.CompareTo(other.collapsedNeighbours);
-        return -compare;
-    }
+    public void UpdateInfo(NodeInfo nodeInfo) => this.nodeInfo = nodeInfo;
 }

@@ -1,0 +1,246 @@
+#pragma kernel NodeRelaxation
+#pragma kernel Collapse
+#pragma kernel UpdateGrid
+#pragma kernel GridDone
+
+struct Node
+{
+    uint possibleTiles;
+    int entropy;
+    uint tile;
+    int x;
+    int y;
+};
+
+struct ProgressData
+{
+    int doneFlag;
+    int collapsedCount;
+};
+
+static const int2 directions[4] =
+{
+    int2(0, 1),
+    int2(1, 0),
+    int2(0, -1),
+    int2(-1, 0)
+};
+
+RWStructuredBuffer<Node> gridCurrent;
+RWStructuredBuffer<Node> gridNext;
+
+StructuredBuffer<uint> compat;
+
+RWStructuredBuffer<Node> collapsedNodes;
+
+int tilesCount;
+
+int gridSizeX;
+int gridSizeY;
+
+StructuredBuffer<int2> startCoords;
+
+float IsInRange(int x, int min, int max)
+{
+    return (x >= min) * (x <= max);
+}
+
+uint CompNeighTiles(uint dToN, int t)
+{
+    return compat[t * 4 + (dToN + 2) % 4];
+}
+
+[numthreads(1, 1, 1)]
+void NodeRelaxation (uint3 groupID : SV_GROUPID)
+{
+    int x = groupID.x;
+    int y = groupID.y;
+
+    int index = x * gridSizeY + y;
+    Node node = gridCurrent[index];
+    
+    
+    if(node.tile != 0)
+    {
+        gridNext[index] = node;
+        return;
+    }
+
+    uint possibleTiles = node.possibleTiles;
+
+    for (int d = 0; d < 4; d++) 
+    {
+        int2 direction = directions[d];
+
+        int neighbourX = x + direction.x;
+        int neighbourY = y + direction.y;
+
+        float hasNeighbour = IsInRange(neighbourX, 0, gridSizeX - 1) * IsInRange(neighbourY, 0, gridSizeY - 1);
+
+        if(hasNeighbour < 0.5)
+            continue;
+        
+        int neighbourIndex = neighbourX * gridSizeY + neighbourY;
+        Node neighbour = gridCurrent[neighbourIndex];
+        
+        if(neighbour.entropy == 1)
+        {
+            int t = firstbitlow(neighbour.possibleTiles);
+            uint connectingTiles = CompNeighTiles(d, t);
+
+            possibleTiles &= connectingTiles;
+
+            continue;
+        }
+        
+        uint neighbourTiles = neighbour.possibleTiles;
+        uint neighbourTilesDup = neighbourTiles;
+        uint possibleConnTiles = 0;
+
+        while(neighbourTilesDup != 0)
+        {
+            int t = firstbitlow(neighbourTilesDup);
+
+            uint connectingTiles = CompNeighTiles(d, t);
+            possibleConnTiles |= connectingTiles;
+
+            neighbourTilesDup &= (neighbourTilesDup - 1);
+        }
+
+        possibleTiles &= possibleConnTiles;
+    }
+
+    if(possibleTiles != node.possibleTiles)
+    {
+        node.possibleTiles = possibleTiles;
+        node.entropy = countbits(possibleTiles);
+    }
+
+    gridNext[index] = node;
+}
+
+groupshared int2 entropies[256];
+int groupsAmountY;
+static const int chunkSize = 16; 
+int edgeSize;
+
+int seed;
+
+int dispatchCounter;
+int dispatchIterations;
+
+uint Hash(uint x)
+{
+    x ^= x >> 16;
+    x *= 0x7feb352d;
+    x ^= x >> 15;
+    x *= 0x846ca68b;
+    x ^= x >> 16;
+    return x;
+}
+
+uint RandomIndex(uint s, uint max)
+{
+    uint x = Hash(s) % max;
+    return x;
+}
+
+int FindIndexSetBit(uint mask, uint index)
+{
+    while(index > 0)
+    {
+        mask &= mask - 1;
+        index--;
+    }
+    
+    return 1 << firstbitlow(mask);
+}
+
+RWStructuredBuffer<ProgressData> progressData;
+
+[numthreads(16, 16, 1)]
+void Collapse(uint3 groupID : SV_GROUPID, uint3 groupThreadID : SV_GROUPTHREADID)
+{
+    uint groupIndex = groupID.x * groupsAmountY + groupID.y;
+    uint groupSeed = seed * (groupIndex + 1);
+    int2 startCoord = startCoords[groupIndex];
+    int localIndex = groupThreadID.x * chunkSize + groupThreadID.y;
+    int globalX = startCoord.x + groupThreadID.x;
+    int globalY = startCoord.y + groupThreadID.y;
+
+    int globalIndex = globalX * gridSizeY + globalY;
+    int entropy = 100000;
+
+    
+    if(globalX < gridSizeX && globalY < gridSizeY)
+        entropy = gridCurrent[globalIndex].entropy;
+
+    if(gridCurrent[globalIndex].tile != 0)
+        entropy = 100000;
+
+    
+    entropies[localIndex] = int2(entropy, globalIndex);
+
+    GroupMemoryBarrierWithGroupSync();
+    
+    for (int i = 128; i > 0; i >>= 1) 
+    {
+        if(localIndex < i)
+        {
+            int2 node = entropies[localIndex];
+            int2 otherNode = entropies[localIndex + i];
+            entropies[localIndex] = node.x <= otherNode.x ? node : otherNode;
+        }
+
+        GroupMemoryBarrierWithGroupSync();
+    }
+
+    if(localIndex != 0)
+        return;
+    
+    if(entropies[0].x > tilesCount)
+        return;
+    
+
+    int nodeIndex = entropies[0].y;
+    Node node = gridCurrent[nodeIndex];
+    
+    uint possibleTiles = node.possibleTiles;
+    entropy = node.entropy;
+    uint index = RandomIndex(groupSeed + dispatchCounter, entropy);
+    node.tile = FindIndexSetBit(possibleTiles, index);
+    node.possibleTiles = node.tile;
+    node.entropy = 1;
+    // node.test = index;
+    collapsedNodes[groupIndex * dispatchIterations + dispatchCounter] = node;
+    
+    gridCurrent[nodeIndex] = node;  
+    progressData[groupIndex].collapsedCount++;
+}
+
+[numthreads(1, 1, 1)]
+void UpdateGrid(uint3 groupID : SV_GROUPID)
+{
+    uint x = groupID.x;
+    uint y = groupID.y;
+
+    uint index = x * gridSizeY + y;
+    gridCurrent[index] = gridNext[index];
+}
+
+[numthreads(16, 16, 1)]
+void GridDone(uint3 groupID : SV_GROUPID, uint3 groupThreadID : SV_GROUPTHREADID)
+{
+    uint groupIndex = groupID.x * groupsAmountY + groupID.y;
+    int2 startCoord = startCoords[groupIndex];
+    int globalX = startCoord.x + groupThreadID.x;
+    int globalY = startCoord.y + groupThreadID.y;
+
+    if(globalX >= gridSizeX || globalY >= gridSizeY)
+        return;
+
+    int globalIndex = globalX * gridSizeY + globalY;
+
+    if(gridCurrent[globalIndex].tile == 0)
+        progressData[groupIndex].doneFlag = 1;
+}

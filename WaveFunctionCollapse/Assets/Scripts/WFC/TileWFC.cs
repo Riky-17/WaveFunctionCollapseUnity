@@ -4,7 +4,7 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "TileWFC", menuName = "TileWFC")]
 public class TileWFC : ScriptableObject
 {
-    public GameObject Object;
+    public GameObject tile;
 
     public int upSocket;
     public int rightSocket;
