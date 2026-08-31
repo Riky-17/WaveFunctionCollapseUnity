@@ -2018,6 +2018,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   computeShaderWFC: {fileID: 7200000, guid: 8c7bf75fdf3b3ca40af13055bc575994, type: 3}
+  outsideTile: {fileID: 11400000, guid: 63095c4a4f575f641bf2cadfce530087, type: 2}
   tiles:
   - {fileID: 11400000, guid: 58c25ff4de4831a42aec7221a28498ac, type: 2}
   - {fileID: 11400000, guid: 84c28952e6700de4caeeae4c1da8ff95, type: 2}

@@ -8,6 +8,8 @@ public class WFC : MonoBehaviour
 {
     [SerializeField] ComputeShader computeShaderWFC;
 
+    [SerializeField] TileWFC outsideTile;
+    int outTileIndex;
     [SerializeField] List<TileWFC> tiles;
 
     List<GameObject> createdTiles = new();
@@ -81,7 +83,19 @@ public class WFC : MonoBehaviour
         new(-1, 0)
     };
 
-    void Awake() => GetTilesCompat();
+    void Awake()
+    {
+        for (int i = 0; i < tiles.Count; i++)
+        {
+            if(tiles[i] == outsideTile)
+            {
+                outTileIndex = i;
+                break;
+            }
+        }
+
+        GetTilesCompat();
+    }
 
     void OnDisable() => ReleaseBuffers();
 
@@ -102,7 +116,6 @@ public class WFC : MonoBehaviour
 
         sw = new();
         sw.Start();
-        GetTilesCompat();
         CreateGrid();
         InitComputeShader();
         WaveFunctionCollapseIteration();
@@ -236,7 +249,7 @@ public class WFC : MonoBehaviour
                     {
                         if (!HasNeighbour(i, x, y))
                         {
-                            uint compTiles = compat[2 * 4 + ((i + 2) % 4)];
+                            uint compTiles = compat[outTileIndex * 4 + ((i + 2) % 4)];
                             nodeInfo.possibleTiles &= compTiles;
                         }
                     }
