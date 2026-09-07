@@ -68,7 +68,7 @@ public class WFC : MonoBehaviour
     float collapsedNodesCount = 0;
 
     int progress = 0;
-    int maxNodesToCollapse;
+    int maxNodesToCollapse => NodesAmountX * NodesAmountY;
 
     Stopwatch sw;
 
@@ -175,17 +175,6 @@ public class WFC : MonoBehaviour
             extraPassDirectionFinalChunk = new Vector2Int[1] { new (1, 0) };
         else if(edgeSizeExtraY > 0)
             extraPassDirectionFinalChunk = new Vector2Int[1] { new (0, 1) };
-
-        int normalNodesToCollapse = chunksAmountX * chunksAmountY * SubChunkSize * SubChunkSize * 4;
-
-        int minExtraX = Mathf.Min(leftoverX, SubChunkSize);
-        int minExtraY = Mathf.Min(leftoverY, SubChunkSize);
-
-        int extraNodesToCOllapseX = extraChunkX * chunksAmountY * minExtraX * SubChunkSize * (extraPassDirectionX.Length + 1);
-        int extraNodesToCollapseY = chunksAmountX * extraChunkY * SubChunkSize * minExtraY * (extraPassDirectionY.Length + 1);
-        int extraNodesToCollapseFinalChunk = extraChunkX * extraChunkY * minExtraX * minExtraY * (extraPassDirectionFinalChunk.Length + 1);
-
-        maxNodesToCollapse = normalNodesToCollapse + extraNodesToCOllapseX + extraNodesToCollapseY + extraNodesToCollapseFinalChunk;
 
         for (int x = 0; x < chunksAmountX; x++)
         {
@@ -438,17 +427,6 @@ public class WFC : MonoBehaviour
             done = false;
             Vector2Int startCoord = chunk.startCoord;
             startCoords[i] = startCoord;
-            for (int x = startCoord.x; x < startCoord.x + chunk.chunkSizeX; x++)
-            {
-                for (int y = startCoord.y; y < startCoord.y + chunk.chunkSizeY; y++)
-                {
-                    int index = x * NodesAmountY + y;
-                    Node node = grid[x, y];
-                    node.Reset();
-                    
-                    gridCurrent[index] = node.NodeInfo;
-                }
-            }
         }
 
         if(done)

@@ -207,11 +207,10 @@ void Collapse(uint3 groupID : SV_GROUPID, uint3 groupThreadID : SV_GROUPTHREADID
     
     uint possibleTiles = node.possibleTiles;
     entropy = node.entropy;
-    uint index = RandomIndex(groupSeed + dispatchCounter, entropy);
+    uint index = RandomIndex(groupSeed + dispatchCounter + nodeIndex, entropy);
     node.tile = FindIndexSetBit(possibleTiles, index);
     node.possibleTiles = node.tile;
     node.entropy = 1;
-    // node.test = index;
     collapsedNodes[groupIndex * dispatchIterations + dispatchCounter] = node;
     
     gridCurrent[nodeIndex] = node;  
