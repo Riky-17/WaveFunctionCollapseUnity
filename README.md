@@ -68,11 +68,11 @@ The first thing to do is to get the compatibility of the tiles to each other. We
     - the idea is an array that takes the index of the tile + the direction of the neighbour as input, and it will output the compatible tiles that the tile can have in that direction.\
     For this reason the size of the array is the amount of tiles multiplied by the amount of directions each tile can be connected to.
 
-'''
+```C#
 
     compat = new uint[tiles.Count * 4];
 
-'''
+```
 
 * Populate the array
     - We iterate through the tiles list.
@@ -84,7 +84,7 @@ The first thing to do is to get the compatibility of the tiles to each other. We
         - The tiles sockets are int fields, if the sockets hold the same value, that means they connect with each other.
     - we mark the connection by setting a bit in the j position, where j is the index of tile B in the tiles list. By doing so we have a bitmask holding information of the tiles that can connect to tile A
 
-'''
+```
 
     for (int i = 0; i < tiles.Count; i++)
         {
@@ -105,4 +105,4 @@ The first thing to do is to get the compatibility of the tiles to each other. We
             }
         }
 
-'''
+```
