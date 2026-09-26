@@ -1,4 +1,4 @@
-#pragma kernel NodeRelaxation
+#pragma kernel Propagation
 #pragma kernel Collapse
 #pragma kernel UpdateGrid
 #pragma kernel GridDone
@@ -51,7 +51,7 @@ uint CompNeighTiles(uint dToN, int t)
 }
 
 [numthreads(1, 1, 1)]
-void NodeRelaxation (uint3 groupID : SV_GROUPID)
+void Propagation (uint3 groupID : SV_GROUPID)
 {
     int x = groupID.x;
     int y = groupID.y;

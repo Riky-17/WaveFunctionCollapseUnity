@@ -3,6 +3,7 @@ using System.Diagnostics;
 using UnityEngine;
 using UnityEngine.Rendering;
 using System;
+using UnityEditor;
 
 public class WFC : MonoBehaviour
 {
@@ -37,7 +38,7 @@ public class WFC : MonoBehaviour
     ProgressData[] progressData;
 
     // Kernels
-    int nodePropagationKernel;
+    int propagationKernel;
     int collapseKernel;
     int updateGridKernel;
     int gridDoneKernel;
@@ -254,14 +255,6 @@ public class WFC : MonoBehaviour
 
                 Node node = new(nodePos, nodeInfo);
 
-                if(x % TotalChunkSize < SubChunkSize && y % TotalChunkSize < SubChunkSize)
-                {
-                    int chunkX = Mathf.FloorToInt(x / TotalChunkSize);
-                    int chunkY = Mathf.FloorToInt(y / TotalChunkSize);
-                    int chunkIndex = chunkX * (chunksAmountY + extraChunkY) + chunkY;
-                    node.chunkIndex = chunkIndex;
-                }
-
                 grid[x, y] = node;
                 gridCurrent[x * NodesAmountY + y] = nodeInfo;
             }
@@ -270,7 +263,7 @@ public class WFC : MonoBehaviour
 
     void InitComputeShader()
     {
-        nodePropagationKernel = computeShaderWFC.FindKernel("NodeRelaxation");
+        propagationKernel = computeShaderWFC.FindKernel("Propagation");
         collapseKernel = computeShaderWFC.FindKernel("Collapse");
         updateGridKernel = computeShaderWFC.FindKernel("UpdateGrid");
         gridDoneKernel = computeShaderWFC.FindKernel("GridDone");
@@ -285,12 +278,12 @@ public class WFC : MonoBehaviour
         gridCurrentBuff = new(gridCurrent.Length, nodeSize);
         gridCurrentBuff.SetData(gridCurrent);
         computeShaderWFC.SetBuffer(collapseKernel, "gridCurrent", gridCurrentBuff);
-        computeShaderWFC.SetBuffer(nodePropagationKernel, "gridCurrent", gridCurrentBuff);
+        computeShaderWFC.SetBuffer(propagationKernel, "gridCurrent", gridCurrentBuff);
         computeShaderWFC.SetBuffer(updateGridKernel, "gridCurrent", gridCurrentBuff);
         computeShaderWFC.SetBuffer(gridDoneKernel, "gridCurrent", gridCurrentBuff);
 
         gridNextBuff = new(gridCurrent.Length, nodeSize);
-        computeShaderWFC.SetBuffer(nodePropagationKernel, "gridNext", gridNextBuff);
+        computeShaderWFC.SetBuffer(propagationKernel, "gridNext", gridNextBuff);
         computeShaderWFC.SetBuffer(updateGridKernel, "gridNext", gridNextBuff);
 
         computeShaderWFC.SetInt("dispatchIterations", dispatchIterations);
@@ -302,7 +295,7 @@ public class WFC : MonoBehaviour
 
         compatBuff = new(compat.Length, sizeof(uint));
         compatBuff.SetData(compat);
-        computeShaderWFC.SetBuffer(nodePropagationKernel, "compat", compatBuff);
+        computeShaderWFC.SetBuffer(propagationKernel, "compat", compatBuff);
 
         computeShaderWFC.SetInt("tilesCount", tiles.Count);
 
@@ -342,7 +335,11 @@ public class WFC : MonoBehaviour
         {
             computeShaderWFC.SetInt("dispatchCounter", i);
             computeShaderWFC.Dispatch(collapseKernel, totalChunksX, totalChunksY, 1);
-            computeShaderWFC.Dispatch(nodePropagationKernel, NodesAmountX, NodesAmountY, 1);
+            computeShaderWFC.Dispatch(propagationKernel, NodesAmountX, NodesAmountY, 1);
+            computeShaderWFC.Dispatch(updateGridKernel, NodesAmountX, NodesAmountY, 1);
+            computeShaderWFC.Dispatch(propagationKernel, NodesAmountX, NodesAmountY, 1);
+            computeShaderWFC.Dispatch(updateGridKernel, NodesAmountX, NodesAmountY, 1);
+            computeShaderWFC.Dispatch(propagationKernel, NodesAmountX, NodesAmountY, 1);
             computeShaderWFC.Dispatch(updateGridKernel, NodesAmountX, NodesAmountY, 1);
         }
 
@@ -437,7 +434,7 @@ public class WFC : MonoBehaviour
 
         gridCurrentBuff.SetData(gridCurrent);
         computeShaderWFC.SetBuffer(collapseKernel, "gridCurrent", gridCurrentBuff);
-        computeShaderWFC.SetBuffer(nodePropagationKernel, "gridCurrent", gridCurrentBuff);
+        computeShaderWFC.SetBuffer(propagationKernel, "gridCurrent", gridCurrentBuff);
         computeShaderWFC.SetBuffer(updateGridKernel, "gridCurrent", gridCurrentBuff);
         computeShaderWFC.SetBuffer(gridDoneKernel, "gridCurrent", gridCurrentBuff);
 
@@ -450,9 +447,9 @@ public class WFC : MonoBehaviour
         computeShaderWFC.SetBuffer(collapseKernel, "progressData", progressDataBuff);
         computeShaderWFC.SetBuffer(gridDoneKernel, "progressData", progressDataBuff);
 
-        computeShaderWFC.Dispatch(nodePropagationKernel, NodesAmountX, NodesAmountY, 1);
+        computeShaderWFC.Dispatch(propagationKernel, NodesAmountX, NodesAmountY, 1);
         computeShaderWFC.Dispatch(updateGridKernel, NodesAmountX, NodesAmountY, 1);
-        computeShaderWFC.Dispatch(nodePropagationKernel, NodesAmountX, NodesAmountY, 1);
+        computeShaderWFC.Dispatch(propagationKernel, NodesAmountX, NodesAmountY, 1);
         computeShaderWFC.Dispatch(updateGridKernel, NodesAmountX, NodesAmountY, 1);
         AsyncGPUReadback.Request(gridCurrentBuff, request => 
         {
@@ -508,9 +505,74 @@ public class WFC : MonoBehaviour
 
     void OnDrawGizmos()
     {
-        Gizmos.DrawLine(new(-(gridSizeX / 2), gridSizeY / 2, 0), new(gridSizeX / 2, gridSizeY / 2, 0));
-        Gizmos.DrawLine(new(-(gridSizeX / 2), -(gridSizeY / 2), 0), new(gridSizeX / 2, -(gridSizeY / 2), 0));
-        Gizmos.DrawLine(new(-(gridSizeX / 2), -(gridSizeY / 2), 0), new(-(gridSizeX / 2), gridSizeY / 2, 0));
-        Gizmos.DrawLine(new(gridSizeX / 2, -(gridSizeY / 2), 0), new(gridSizeX / 2, gridSizeY / 2, 0));
+        // Gizmos.DrawLine(new(-(gridSizeX / 2), gridSizeY / 2, 0), new(gridSizeX / 2, gridSizeY / 2, 0));
+        // Gizmos.DrawLine(new(-(gridSizeX / 2), -(gridSizeY / 2), 0), new(gridSizeX / 2, -(gridSizeY / 2), 0));
+        // Gizmos.DrawLine(new(-(gridSizeX / 2), -(gridSizeY / 2), 0), new(-(gridSizeX / 2), gridSizeY / 2, 0));
+        // Gizmos.DrawLine(new(gridSizeX / 2, -(gridSizeY / 2), 0), new(gridSizeX / 2, gridSizeY / 2, 0));
+
+        // Gizmos.color = new (0, 1, 0, .85f);
+        // Gizmos.DrawCube(new(-55, 10), new(5, 5));
+        // Gizmos.color = new (1, 0, 0, .85f);
+        // Gizmos.DrawCube(new(-55, 0), new(5, 5));
+        // Gizmos.color = new (1, 1, 1, .85f);
+        // Gizmos.DrawCube(new(-55, -10), new(5, 5));
+
+        // Gizmos.color = new (1, 1, 1, .85f);
+        // Gizmos.DrawCube(new(-10, -10), new(15, 15));
+        // Gizmos.DrawCube(new(-10, 10), new(15, 15));
+        // Gizmos.DrawCube(new(10, -10), new(15, 15));
+        // Gizmos.DrawCube(new(10, 10), new(15, 15));
+        // Gizmos.color = new (1, 0, 0, .85f);
+        // Gizmos.DrawCube(Vector3.zero, new(35, 5));
+        // Gizmos.DrawCube(Vector3.zero, new(5, 35));
+
+        // Gizmos.color = new (0, 1, 0, .85f);
+        // Gizmos.DrawCube(new(-10, -10), new(15, 15));
+        // Gizmos.DrawCube(new(-10, 10), new(15, 15));
+        // Gizmos.DrawCube(new(10, -10), new(15, 15));
+        // Gizmos.DrawCube(new(10, 10), new(15, 15));
+        // Gizmos.color = new (1, 1, 1, .85f);
+        // Gizmos.DrawCube(new(-10, 0), new(15, 15));
+        // Gizmos.DrawCube(new(-10, 20), new(15, 15));
+        // Gizmos.DrawCube(new(10, 0), new(15, 15));
+        // Gizmos.DrawCube(new(10, 20), new(15, 15));
+        // Gizmos.color = new (1, 0, 0, .85f);
+        // Gizmos.DrawCube(Vector3.zero, new(5, 35));
+
+        // Gizmos.color = new (0, 1, 0, .85f);
+        // Gizmos.DrawCube(new(-10, 0), new(15, 35));
+        // Gizmos.DrawCube(new(10, 0), new(15, 35));
+        // Gizmos.color = new (1, 1, 1, .85f);
+        // Gizmos.DrawCube(new(0, 0), new(15, 15));
+        // Gizmos.DrawCube(new(0, 20), new(15, 15));
+        // Gizmos.DrawCube(new(20, 0), new(15, 15));
+        // Gizmos.DrawCube(new(20, 20), new(15, 15));
+        // Gizmos.color = new (1, 0, 0, .85f);
+        // Gizmos.DrawCube(new(0, 10), new(5, 5));
+        // Gizmos.DrawCube(new(0, -12.5f), new(5, 10));
+
+        // Gizmos.color = new (0, 1, 0, .85f);
+        // Gizmos.DrawCube(new(-10, 0), new(15, 35));
+        // Gizmos.DrawCube(new(10, 0), new(15, 35));
+        // Gizmos.DrawCube(new(0, 15), new(5, 5));
+        // Gizmos.DrawCube(new(0, 0), new(5, 10));
+        // Gizmos.DrawCube(new(0, 6.25f), new(5, 2.5f));
+        // Gizmos.DrawCube(new(0, -6.25f), new(5, 2.5f));
+        // Gizmos.color = new (1, 1, 1, .85f);
+        // Gizmos.DrawCube(new(0, -10), new(15, 15));
+        // Gizmos.DrawCube(new(0, 10), new(15, 15));
+        // Gizmos.DrawCube(new(20, -10), new(15, 15));
+        // Gizmos.DrawCube(new(20, 10), new(15, 15));
+
+        // Gizmos.color = new (0, 1, 0, .85f);
+        // Gizmos.DrawCube(new(0, 0), new(35, 35));
+
+        for (int i = 0; i < 4; i++)
+        {
+            float posI = -1.5f + i;
+            Gizmos.DrawLine(new(posI, -1.5f), new(posI, 1.5f));
+            Gizmos.DrawLine(new(-1.5f, posI), new(1.5f, posI));
+        }
+
     }
 }

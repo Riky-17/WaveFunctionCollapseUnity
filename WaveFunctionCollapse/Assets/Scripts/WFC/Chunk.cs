@@ -7,16 +7,16 @@ public struct Chunk
     public int edgeSizeY;
     Vector2Int[] passDirections;
     public int passIndex;
-    public int chunkSizeX;
-    public int chunkSizeY;
+    public int subChunkSizeX;
+    public int subChunkSizeY;
 
-    public Chunk(Vector2Int startCoord, int chunkSize, int edgeSize, Vector2Int[] passDirections) : this(startCoord, chunkSize, chunkSize, edgeSize, edgeSize, passDirections) {}
+    public Chunk(Vector2Int startCoord, int subChunkSize, int edgeSize, Vector2Int[] passDirections) : this(startCoord, subChunkSize, subChunkSize, edgeSize, edgeSize, passDirections) {}
 
-    public Chunk(Vector2Int startCoord, int chunkSizeX, int chunkSizeY, int edgeSizeX, int edgeSizeY, Vector2Int[] passDirections)
+    public Chunk(Vector2Int startCoord, int subChunkSizeX, int subChunkSizeY, int edgeSizeX, int edgeSizeY, Vector2Int[] passDirections)
     {
         this.startCoord = startCoord;
-        this.chunkSizeX = chunkSizeX;
-        this.chunkSizeY = chunkSizeY;
+        this.subChunkSizeX = subChunkSizeX;
+        this.subChunkSizeY = subChunkSizeY;
         this.edgeSizeX = edgeSizeX;
         this.edgeSizeY = edgeSizeY;
         this.passDirections = passDirections;

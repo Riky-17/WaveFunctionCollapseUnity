@@ -17,10 +17,10 @@ public struct NodeInfo
         this.possibleTiles = possibleTiles;
         entropy = 0;
 
-        for (int i = 0; i < 12; i++)
+        while(possibleTiles != 0)
         {
-            if((possibleTiles & 1 << i) != 0)
-                entropy++;
+            possibleTiles &= possibleTiles - 1;
+            entropy++;
         }
 
         tile = 0;
@@ -33,8 +33,6 @@ public class Node
     NodeInfo nodeInfo;
     NodeInfo originalInfo;
     public Vector2 nodePos;
-    public int heapIndex;
-    public int chunkIndex = -1;
 
     public Node(Vector2 pos, NodeInfo nodeInfo)
     {
