@@ -244,7 +244,7 @@ The [compute shader](./WaveFunctionCollapse/Assets/ComputeShaderWFC.compute) is 
 ***
 ### Collapse Kernel
 
-The way the Collapse Kernel works, is that each chunk has one thread group assigned to it, the thread group size is the same as the size of the collapsing part of the chunk, so 16x16.
+The way the [Collapse Kernel](https://github.com/Riky-17/WaveFunctionCollapseUnity/blob/a27eba7d5ae6715831515d423d91a8eb6bc13243/WaveFunctionCollapse/Assets/ComputeShaderWFC.compute#L160-L217) works, is that each chunk has one thread group assigned to it, the thread group size is the same as the size of the collapsing part of the chunk, so 16x16.
 
 ```glsl
 
@@ -287,7 +287,72 @@ The node is collapse by picking a random set bit in the possibleTiles bitmask, a
 
 ### Propagation And Update Kernels
 
-The idea behind the Propagation Kernel, is that, with the help of 2 compute buffers, one for the current grid, and one for the grid after the propagation is done, each thread is assigned to a node of the current grid's compute buffer, they will look at their neighbour's tile, if they are collapsed, otherwise they will look at their neighbour's possible tiles, and reduce their entropy by removing tile that cannot connect to their neighbour, the threads will then write their assigned node into the compute buffer of the update grid.
+The idea behind the [Propagation Kernel](https://github.com/Riky-17/WaveFunctionCollapseUnity/blob/a27eba7d5ae6715831515d423d91a8eb6bc13243/WaveFunctionCollapse/Assets/ComputeShaderWFC.compute#L53-L119), is that, with the help of 2 compute buffers, one for the current grid, and one for the grid after the propagation is done, each thread is assigned to a node of the current grid's compute buffer, the threads will look at their neighbour, and see if they are collapsed, if they are then they will reduce their entropy using the compatibility array:
+
+```glsl
+
+uint CompNeighTiles(uint dToN, int t)
+{
+    return compat[t * 4 + (dToN + 2) % 4];
+}
+
+```
+
+```glsl
+
+for (int d = 0; d < 4; d++) 
+{
+    //...
+
+    Node neighbour = gridCurrent[neighbourIndex];
+    
+    if(neighbour.entropy == 1)
+    {
+        int t = firstbitlow(neighbour.possibleTiles);
+        uint connectingTiles = CompNeighTiles(d, t);
+
+        possibleTiles &= connectingTiles;
+
+        continue;
+    }
+
+    //...
+
+}
+
+```
+
+if their neighbor is not collapsed, the thread will then look at their possible tiles and reduce their entropy using their possibleTiles bitmask:
+
+```glsl
+
+for (int d = 0; d < 4; d++) 
+{
+    //...
+
+    Node neighbour = gridCurrent[neighbourIndex];
+    
+    uint neighbourTiles = neighbour.possibleTiles;
+    uint possibleConnTiles = 0;
+
+    while(neighbourTiles != 0)
+    {
+        int t = firstbitlow(neighbourTiles);
+
+        uint connectingTiles = CompNeighTiles(d, t);
+        possibleConnTiles |= connectingTiles;
+
+        neighbourTiles &= (neighbourTiles - 1);
+    }
+
+    possibleTiles &= possibleConnTiles;
+}
+
+```
+
+The threads will then write their assigned node into the compute buffer of the updated grid.
+
+The [Update Grid Kernel](https://github.com/Riky-17/WaveFunctionCollapseUnity/blob/a27eba7d5ae6715831515d423d91a8eb6bc13243/WaveFunctionCollapse/Assets/ComputeShaderWFC.compute#L219-L227) updates the compute buffers by simply bringing the elements of the updated grid into the old grid.
 
 ```glsl
 
@@ -302,8 +367,6 @@ void UpdateGrid(uint3 groupID : SV_GROUPID)
 }
 
 ```
-
-The update Grid Kernel will updating the compute buffers by simply bringing the elements of the updated grid into the old grid.
 ***
 
 ### Grid Done Kernel
@@ -329,7 +392,7 @@ void GridDone(uint3 groupID : SV_GROUPID, uint3 groupThreadID : SV_GROUPTHREADID
 
 ```
 
-This kernel's job is to simply check each node of each chunk, and see if they are all collapsed, this information is then used in the C# side to determine if the algorithm should go to the next pass.
+The [Grid Done Kernel](https://github.com/Riky-17/WaveFunctionCollapseUnity/blob/a27eba7d5ae6715831515d423d91a8eb6bc13243/WaveFunctionCollapse/Assets/ComputeShaderWFC.compute#L229-L244)'s job is to simply check each node of each chunk, and see if they are all collapsed, this information is then used in the C# side to determine if the algorithm should go to the next pass.
 
 ## Performance
 
