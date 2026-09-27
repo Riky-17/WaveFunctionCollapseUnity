@@ -60,11 +60,24 @@ The biggest drawback is that, because of the layers and the overlapping chunks, 
 ## My Approach
 
 Because of this wasted work, I tried to modify the approach in a way that the algorithm would avoid doing work that would later be discarded.\
-My approach still divides the grid into chunks separated by a gap. The first pass collapses each chunk normally. Then, in the next pass, the algorithm shifts the chunks upward by the size of the gap, so that they just cover the gap connecting the two chunks of the first pass, and overlapping only the one chunk of their previous layer.\
-Here in BorisTheBrave's approach the new chunk in the new layer would overlap two chunks of the old layer, in my approach each new chunk only overlaps one chunk.\
-Another difference is that the algorithm doesn't uncollapse the overlapping nodes, instead, the algorithm will only need to collapse the nodes that have not already been collapsed.\
-As a result, the gap connecting the two chunks in the first pass will now be collapsed.\
-the algorithm will repeat this process two more times by switching the chunk to the right on the third pass and downward on the fourth and final pass.
+We first divide the grid in chunks, we then take a smaller part of the chunk, a sub chunk, this smaller part is the collapsing part of the chunk.\
+The result will look something like this:
+
+![WFC My Approach First Pass](./Images/WFCMyApproach1Pass.png)
+
+When the sub chunk have done collapsing, the algorithm will then shift the sub chunks upward until they cover the edge of their chunk, this will result in the sub chunk of the new pass now overlapping the sub chunk of the previous pass without going over and overlapping sub chunks of other chunks.
+
+![WFC My Approach Second Pass](./Images/WFCMyApproach2Pass.png)
+
+The sub chunks are then collapsed once again without uncollapsing the overlapping nodes, the algorithm will instead skip any node that is already collapsed from a previous pass. At the end of the pass we can see that some of the chunks will now look connected:
+
+![WFC My Approach Third Pass](./Images/WFCMyApproach3Pass.png)
+
+This process is also repeated 2 more times. In the third pass the sub chunks will shift to the left, and in the fourth and final pass the sub chunks will shift downward.
+
+![WFC My Approach Fourth Pass](./Images/WFCMyApproach4Pass.png)
+
+![WFC My Approach Result](./Images/WFCMyApproachResult.png)
 
 The result is a multithreaded WFC approach that aims to minimize redundant work while still allowing the chunks to be processed in parallel.
 
@@ -320,11 +333,15 @@ This kernel's job is to simply check each node of each chunk, and see if they ar
 
 ## Performance
 
-| Grid Size | Single Threaded | Multi Threaded |
-| --- | ---: | ---: |
-| 50x50 | 80ms | 435ms |
-| 100x100 | 318ms | 647ms |
-| 150x150 | 673ms | 835ms |
-| 200x200 | 1234ms | 1058ms |
-| 300x300 | 2865ms | 1695ms |
-| 400x400 | 5193ms | 2840ms |
+If we compare the performance of the single threaded version of the algorithm with the multi threaded approach, we can see that the single threaded version is actually more preferable on smaller grids, but as the grid becomes bigger and the amount of work increases, the multi threaded approach becomes faster.
+
+| Grid Size | Single Threaded | Multi Threaded | Speed Up |
+| --- | ---: | ---: | ---: |
+| 50x50 | 80ms | 435ms | 0.18x |
+| 100x100 | 318ms | 647ms | 0.49x |
+| 150x150 | 673ms | 835ms | 0.81x |
+| 200x200 | 1234ms | 1058ms | 1.17x |
+| 300x300 | 2865ms | 1695ms | 1.69x |
+| 400x400 | 5193ms | 2840ms | 1.83x |
+
+*Note: The comparison was made without keeping track of the time it takes for Unity to instantiate all of the game objects at once in the multithreaded approach, if we keep track of it, then the multithreaded approach will result slightly slower than the single threaded approach.
