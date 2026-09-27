@@ -94,17 +94,16 @@ void Propagation (uint3 groupID : SV_GROUPID)
         }
         
         uint neighbourTiles = neighbour.possibleTiles;
-        uint neighbourTilesDup = neighbourTiles;
         uint possibleConnTiles = 0;
 
-        while(neighbourTilesDup != 0)
+        while(neighbourTiles != 0)
         {
-            int t = firstbitlow(neighbourTilesDup);
+            int t = firstbitlow(neighbourTiles);
 
             uint connectingTiles = CompNeighTiles(d, t);
             possibleConnTiles |= connectingTiles;
 
-            neighbourTilesDup &= (neighbourTilesDup - 1);
+            neighbourTiles &= (neighbourTiles - 1);
         }
 
         possibleTiles &= possibleConnTiles;
