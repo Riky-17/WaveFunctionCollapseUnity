@@ -317,3 +317,14 @@ void GridDone(uint3 groupID : SV_GROUPID, uint3 groupThreadID : SV_GROUPTHREADID
 ```
 
 This kernel's job is to simply check each node of each chunk, and see if they are all collapsed, this information is then used in the C# side to determine if the algorithm should go to the next pass.
+
+## Performance
+
+| Grid Size | Single Threaded | Multi Threaded |
+| --- | ---: | ---: |
+| 50x50 | 80ms | 435ms |
+| 100x100 | 318ms | 647ms |
+| 150x150 | 673ms | 835ms |
+| 200x200 | 1234ms | 1058ms |
+| 300x300 | 2865ms | 1695ms |
+| 400x400 | 5193ms | 2840ms |
