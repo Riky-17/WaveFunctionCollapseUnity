@@ -10,6 +10,10 @@
 
 * [Code Explanation](#code-explanation)
 
+* [Performance](#performance)
+
+* [Implementation Limitations](#implementation-limitations)
+
 ## What is Wave Function Collapse?
 The Wave Function Collapse (WFC) is an algorithm used to generate worlds by following a set of rules. The algorithm starts with a grid of nodes. Every node, initially, can be any type of tile, the amount of possible tiles that each node can be is referred to as its entropy.
 
@@ -94,10 +98,31 @@ compat = new uint[tiles.Count * 4];
 
 ```
 
-The compatibility array is a uint array where each element is used as a bitmask to determine the compatible tiles for each tile in each direction.
-The array takes as input the index of the tile in the "tiles" list, multiplied by 4, which is the amount of sides the tile can be connected to, + the direction of the neighbour we want to connect to the tile, where 0 is upward, and goes around clockwise, the output we will receive from it is the bitmask holding information regarding the compatible tiles.
+The compatibility array is a `uint` array where each element is used as a bitmask to store which tiles are compatible with a given tile in a specific direction.
 
-To populate the array:
+The array is indexed using:
+
+tileIndex * 4 + direction
+
+Since each tile has four possible directions, the first four elements correspond to the first tile, the next four to the second tile, and so on.
+
+The directions are represented by a `Vector2Int` list, starting upward and proceeding clockwise:
+
+```C#
+
+readonly List<Vector2Int> directions = new()
+{
+    new(0, 1),
+    new(1, 0),
+    new(0, -1),
+    new(-1, 0)
+};
+
+```
+
+For example, `compat[i * 4 + d]` returns the bitmask containing all tiles that can be placed next to tile `i` in direction `d`.
+
+**To populate the array:**
 
 ```C#
 
@@ -122,25 +147,26 @@ for (int i = 0; i < tiles.Count; i++)
 
 ```
 
-* We iterate through the tiles list.
-* We iterate through each direction the tiles can be connected to.
-    * here we have a directions list, a simple Vector2 list holding 4 directions. It starts upward, and goes around clockwise.
-    ```C#
-    readonly List<Vector2Int> directions = new()
-    {
-        new(0, 1),
-        new(1, 0),
-        new(0, -1),
-        new(-1, 0)
-    };
-    ```
-* We iterate through the tiles list again.
-    * These will be the tiles that we use to see if they can be connected with the tile we got in the first for loop.
-* We compare tile A's socket that faces the current direction with tile B's socket that faces the opposite direction.
-    * The tiles sockets are int fields, if the sockets hold the same value, that means they connect with each other.
-* We mark the connection by setting a bit in the j position, where j is the index of tile B in the tiles list.
+The array is populated using three nested loops:
 
-By doing so, at the end of the third for loop, we will have a bitmask holding information of the tiles that can connect to tile A in that particular direction, we add that to the array.
+1. Iterate through every tile.\
+This is the tile for which we want to find compatible neighbours.
+2. Iterate through each direction.\
+For each direction, we determine which tiles are compatible with the current tile.
+3. Iterate through every tile again.\
+Each tile is tested as a potential compatible neighbour.
+
+The sockets of the two tiles are then compared. The socket of tile A facing the current direction is compared with the socket of tile B facing the opposite direction:
+
+`if(tile.GetSocket(d) == compTile.GetSocket((d + 2) % directions.Count))`
+
+The sockets are represented as integer fields. If the the values are equal it means the tiles can connect.
+
+When the two tiles are compatible, the bit corresponding to tile's B index is set:\
+`compTiles |= (uint)(1 << j);`
+
+
+By doing so, at the end of the innermost for loop, `compTiles` contains a bitmask representing every tile that can connect to tile A in the current direction. This bitmask is then stored in the compatibility array.
 
 ***
 ### Chunk Struct
@@ -161,12 +187,18 @@ public struct Chunk
 
 ```
 
-The chunk struct holds information regarding the starting node of the chunk instance, the size of the edge, the directions the chunks shift towards at every pass, the current pass, and the size of the collapsing part of the chunk.
+The `Chunk` struct holds information needed to work on a portion of the grid. This includes:
+* Its starting coordinates.
+* The size of its edges.
+* The directions used to shift the subChunk between passes.
+* The current pass.
+* The size of the subChunk, the collapsing area of the chunk.
 
-The reason why the edgeSize and subChunkSize is separated across the 2 axis, is because, in case the grid total size can't be perfectly divided, the leftover nodes will be assigned to smaller sized chunks.\
-For example, if the grid size is 43x20, and the total chunk size (subChunkSize + edgeSize) is 20x20, the grid will have 3 chunks along the x axis, 2 of them will be normal sized, and the last one, instead of being a 20x20 sized chunk, it wil be a 3x20.
+The `edgeSize` and `subChunkSize` values are stored separately for the X and Y axes because the grid may not divide evenly into chunks.
 
-Lastly, when the algorithm goes to the next pass and needs to shift the chunks, it simply calls this function on the chunk struct for each chunk in the grid.
+For example, if the grid size is 43x20, and the total chunk size (subChunkSize + edgeSize) is 20x20, the grid can be divided into 3 chunks along the X axis. The first two chunks will be 20x20, while the remaining chunk will be 3x20.
+
+When the algorithm goes to the next pass, the chunk's starting coordinate is updates using the following method:
 
 ```C#
 
@@ -183,7 +215,8 @@ public bool UpdatePass()
 
 ```
 
-Normally, every chunk needs to go through all four passes before they are done collapsing, but that's not true for the leftover chunks, if the  total size of the leftover chunk is smaller or equal in one of the axis than the size of the subChunk, then there is no need for that chunk to shift along that axis, which means that we can cut 2 passes from that chunk.
+Normally, a chunk needs to go through all four passes before it has finished collapsing. However, depending on the size of the grid, leftover chunks can sometimes be smaller than the sub-chunk size along on of their axes.\
+In these cases, the chunk does not need to shift along that axis. This allows the corresponding passes to be skipped for those chunks, reducing unnecessary work.
 ***
 
 ### Node and NodeInfo
@@ -194,13 +227,14 @@ public class Node
 {
     public NodeInfo NodeInfo => nodeInfo;
     NodeInfo nodeInfo;
-    NodeInfo originalInfo;
     public Vector2 nodePos;
 }
 
 ```
 
-Because of the multithreaded approach, we cannot directly use the Node class, instead the NodeInfo struct is what we will pass to the compute shader.
+The `Node` class represents a cell in the grid.
+
+However, because the generation is performed using a compute shader, the class itself cannot be passed directly to the shader. Instead, the data needed by the compute shader is stored in the `NodeInfo` struct:
 
 ```C#
 
@@ -230,11 +264,19 @@ public struct NodeInfo
 }
 
 ```
-For the same reason, we cannot use a List<> of tiles to determine the possible tiles each node has, so we instead use a bitmask as uint to keep track of the possible tiles,
+Instead of storing the possible tiles the node can be into a `List<>`, the `NodeInfo` struct uses a `uint` bitmask.
+
+This allows the possible tiles of a node to be stored in a compact format and makes it possible to perform compatibility checks and remove possibilities using bitwise operations.
+
+The `entropy` value represents the number of possible tiles remaining for the node. It is calculated by counting the number of set bits in `possibleTiles`.
+
+`possibleTiles &= possibleTiles - 1;`
+
+This operation removes the lowest set bit. Repeating it until the value reaches zero gives the total number of possible tiles.
 ***
 ### Compute Shader
 
-The [compute shader](./WaveFunctionCollapse/Assets/ComputeShaderWFC.compute) is made of 4 kernels:
+The [compute shader](./WaveFunctionCollapse/Assets/ComputeShaderWFC.compute) contains four kernels:
 
 * The [Collapse Kernel](#collapse-kernel)
 * The [Propagation Kernel](#propagation-and-update-kernels)
@@ -244,13 +286,23 @@ The [compute shader](./WaveFunctionCollapse/Assets/ComputeShaderWFC.compute) is 
 ***
 ### Collapse Kernel
 
-The way the [Collapse Kernel](https://github.com/Riky-17/WaveFunctionCollapseUnity/blob/a27eba7d5ae6715831515d423d91a8eb6bc13243/WaveFunctionCollapse/Assets/ComputeShaderWFC.compute#L160-L217) works, is that each chunk has one thread group assigned to it, the thread group size is the same as the size of the collapsing part of the chunk, so 16x16.
+The [Collapse Kernel](https://github.com/Riky-17/WaveFunctionCollapseUnity/blob/a27eba7d5ae6715831515d423d91a8eb6bc13243/WaveFunctionCollapse/Assets/ComputeShaderWFC.compute#L160-L217) is responsible for finding and collapsing the node with the lowest entropy within each chunk.
+
+Each chunk is assigned to one thread group, with the thread group size matching the size of the sub-chunk, the chunk's collapsing part. In this implementation, the collapsing area is 16x16, resulting in 256 threads per group.
+
+Each thread is assigned to one node and writes its entropy, along its global index, into a group-shared memory:
 
 ```glsl
 
 entropies[localIndex] = int2(entropy, globalIndex);
 
 GroupMemoryBarrierWithGroupSync();
+
+```
+
+The thread then performs a parallel reduction to find the node with the lowest entropy:
+
+```glsl
 
 for (int i = 128; i > 0; i >>= 1) 
 {
@@ -266,7 +318,11 @@ for (int i = 128; i > 0; i >>= 1)
 
 ```
 
-each thread is assigned to one of the nodes in the chunk, where they will write the entropy of their assigned node into a group shared array, then half of the threads will compare their assigned node's entropy with one of the second half and keep track of the uncollapsed node with the least entropy, this procedure continues until only one node remains.
+At each iteration, half of the remaining thread compare their current node with another node from the second half of the array. The node with the lower entropy is kept.\
+The number of active threads is halved after each iteration.
+
+Once the loop is done, `entropies[0]` contains the index of the node with the lowest entropy.\
+The selected node is then collapsed by randomly choosing one of the set bits in its `possibleTiles` bitmask:
 
 ```glsl
 
@@ -282,12 +338,27 @@ node.entropy = 1;
 collapsedNodes[groupIndex * dispatchIterations + dispatchCounter] = node;
 
 ```
-The node is collapse by picking a random set bit in the possibleTiles bitmask, and finally the node is then saved in a ComputeBuffer which will then be read by the C# side,
+
+`RandomIndex` generates a random number that ranges from 0 up to the entropy of the tile, `FindIndexSetBit` then converts the index in a bitmask where the only set bit represents the tile the node is collapsed as. The collapsed node is then stored in the `collapsedNodes` buffer so that it can be read bak by the c# side. 
 ***
 
 ### Propagation And Update Kernels
 
-The idea behind the [Propagation Kernel](https://github.com/Riky-17/WaveFunctionCollapseUnity/blob/a27eba7d5ae6715831515d423d91a8eb6bc13243/WaveFunctionCollapse/Assets/ComputeShaderWFC.compute#L53-L119), is that, with the help of 2 compute buffers, one for the current grid, and one for the grid after the propagation is done, each thread is assigned to a node of the current grid's compute buffer, the threads will look at their neighbour, and see if they are collapsed, if they are then they will reduce their entropy using the compatibility array:
+The [Propagation Kernel](https://github.com/Riky-17/WaveFunctionCollapseUnity/blob/a27eba7d5ae6715831515d423d91a8eb6bc13243/WaveFunctionCollapse/Assets/ComputeShaderWFC.compute#L53-L119) is responsible for reducing the possible tiles of each node based on their neighbours.
+
+The propagation uses two compute buffers:
+* `gridCurrent`: the current state of the grid.
+* `gridNext`: the grid after the current propagation step.
+
+Using two buffers prevents threads from reading values that have already been modified during the same propagation step.
+
+Each thread processes one node from `gridCurrent`, examines its four neighbours and calculates which tile remain valid
+
+**Collapsed Neighbors**
+
+If a neighboring node has already collapsed, only its selected tile needs to be considered.
+
+The compatibility array is accessed using the followin method:
 
 ```glsl
 
@@ -297,6 +368,8 @@ uint CompNeighTiles(uint dToN, int t)
 }
 
 ```
+
+For a collapsed neighbor, its selected tile is used to retrieve the set of tiles that can connect to it:
 
 ```glsl
 
@@ -322,7 +395,12 @@ for (int d = 0; d < 4; d++)
 
 ```
 
-if their neighbor is not collapsed, the thread will then look at their possible tiles and reduce their entropy using their possibleTiles bitmask:
+The current node's `possibleTiles` bitmask is intersected with the compatible tiles using a bitwise AND operation.\
+This will remove any tile that cannot connect to the collapsed neighbor.
+
+**Uncollapsed Neighbors**
+
+If the neighbor has not yet collapsed, the thread will instead iterate through the neighbor's `possibleTiles` bitmask and combine the compatibility sets of all it possible tiles:
 
 ```glsl
 
@@ -350,9 +428,13 @@ for (int d = 0; d < 4; d++)
 
 ```
 
-The threads will then write their assigned node into the compute buffer of the updated grid.
+`possibleConnTiles` represents every tile that could connect to at least one of the neighbor's possible tiles.\
+Using a bitwise AND operation, the current node will then only keep the tiles already present in its bitmask.
 
-The [Update Grid Kernel](https://github.com/Riky-17/WaveFunctionCollapseUnity/blob/a27eba7d5ae6715831515d423d91a8eb6bc13243/WaveFunctionCollapse/Assets/ComputeShaderWFC.compute#L219-L227) updates the compute buffers by simply bringing the elements of the updated grid into the old grid.
+Once all four neighbors have been processed, the thread writes the resulting node into `gridNext`.
+
+
+The [Update Grid Kernel](https://github.com/Riky-17/WaveFunctionCollapseUnity/blob/a27eba7d5ae6715831515d423d91a8eb6bc13243/WaveFunctionCollapse/Assets/ComputeShaderWFC.compute#L219-L227) updates the compute buffers by copying the elements in the `gridNext` buffer into the `gridCurrent` buffer.
 
 ```glsl
 
@@ -367,9 +449,16 @@ void UpdateGrid(uint3 groupID : SV_GROUPID)
 }
 
 ```
+
+This completes one propagation step and makes the updated grid the input for the next step.
+
 ***
 
 ### Grid Done Kernel
+
+The [Grid Done Kernel](https://github.com/Riky-17/WaveFunctionCollapseUnity/blob/a27eba7d5ae6715831515d423d91a8eb6bc13243/WaveFunctionCollapse/Assets/ComputeShaderWFC.compute#L229-L244) checks whether all nodes belonging to a chunk have been collapsed.
+
+Each thread corresponds to one node within its chunk:
 
 ```glsl
 
@@ -392,8 +481,6 @@ void GridDone(uint3 groupID : SV_GROUPID, uint3 groupThreadID : SV_GROUPTHREADID
 
 ```
 
-The [Grid Done Kernel](https://github.com/Riky-17/WaveFunctionCollapseUnity/blob/a27eba7d5ae6715831515d423d91a8eb6bc13243/WaveFunctionCollapse/Assets/ComputeShaderWFC.compute#L229-L244)'s job is to simply check each node of each chunk, and see if they are all collapsed, this information is then used in the C# side to determine if the algorithm should go to the next pass.
-
 ## Performance
 
 If we compare the performance of the single threaded version of the algorithm with the multi threaded approach, we can see that the single threaded version is actually more preferable on smaller grids, but as the grid becomes bigger and the amount of work increases, the multi threaded approach becomes faster.
@@ -408,3 +495,27 @@ If we compare the performance of the single threaded version of the algorithm wi
 | 400x400 | 5193ms | 2840ms | 1.83x |
 
 *Note: The comparison was made without keeping track of the time it takes for Unity to instantiate all of the game objects at once in the multithreaded approach, if we keep track of it, then the multithreaded approach will result slightly slower than the single threaded approach.
+
+## Implementation Limitations
+
+While this implementation provides performance benefits from GPU processing and bitmask representation, it also introduces a few limitations.
+
+### Maximum of 32 Tiles
+
+The possible tiles of each node are stored in a `uint` bitmask, with each bit representing one possible tile.
+
+Since uint have 32 bits, the maximum amount of tiles a bitmask can hold is 32.
+
+Supporting more tiles would require a different representation, such as multiple `uint` values or a larger bitset. However, this would make the compatibility and propagation operations more complex and potentially reduce some of the performance benefits of the current approach.
+
+### Fixed Thread Group Size
+
+The Collapse kernel and the Grid Done Kernel rely on a 16x16 thread group, giving each chunk 256 threads:
+
+`[numthreads(16, 16, 1)]`
+
+The dimensions of a compute shader's thread group are compile-time constants, meaning they cannot be dynamically changed.
+
+Because this implementation maps one thread to each node in the collapsing area, the sub-chunk size is therefore fixes to 16x16.
+
+This means that the current implementation cannot dynamically adjust the sub-chunk size based on the grid dimensions, or even from the unity inspector.
