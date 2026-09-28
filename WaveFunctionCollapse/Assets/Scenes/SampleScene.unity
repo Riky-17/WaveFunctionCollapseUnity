@@ -495,7 +495,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: = Current Layer
+  m_text: = Sub Chunks
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -2394,9 +2394,40 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 897b9f32edd9a8a4ab3bb063c925aeb5, type: 2}
   - {fileID: 11400000, guid: 382499768e0a0f2429d967083943f3a0, type: 2}
   - {fileID: 11400000, guid: 534d2f828cf8dbb44b1bd2fbaee10ee0, type: 2}
-  gridSizeX: 67
-  gridSizeY: 99
+  gridSizeX: 200
+  gridSizeY: 200
   edgeSize: 4
+--- !u!1 &1648140009
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1648140010}
+  m_Layer: 0
+  m_Name: GameObject (3)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1648140010
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1648140009}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -2.4, y: -17.5, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1793021055
 GameObject:
   m_ObjectHideFlags: 0
@@ -3241,3 +3272,4 @@ SceneRoots:
   - {fileID: 140864632}
   - {fileID: 1831664640}
   - {fileID: 458389591}
+  - {fileID: 1648140010}

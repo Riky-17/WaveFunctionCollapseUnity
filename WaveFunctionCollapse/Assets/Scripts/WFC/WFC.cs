@@ -334,11 +334,15 @@ public class WFC : MonoBehaviour
         for (int i = 0; i < dispatchIterations; i++)
         {
             computeShaderWFC.SetInt("dispatchCounter", i);
+
             computeShaderWFC.Dispatch(collapseKernel, totalChunksX, totalChunksY, 1);
+
             computeShaderWFC.Dispatch(propagationKernel, NodesAmountX, NodesAmountY, 1);
             computeShaderWFC.Dispatch(updateGridKernel, NodesAmountX, NodesAmountY, 1);
+
             computeShaderWFC.Dispatch(propagationKernel, NodesAmountX, NodesAmountY, 1);
             computeShaderWFC.Dispatch(updateGridKernel, NodesAmountX, NodesAmountY, 1);
+            
             computeShaderWFC.Dispatch(propagationKernel, NodesAmountX, NodesAmountY, 1);
             computeShaderWFC.Dispatch(updateGridKernel, NodesAmountX, NodesAmountY, 1);
         }
@@ -462,6 +466,7 @@ public class WFC : MonoBehaviour
 
     void EndAlgo()
     {
+        sw.Stop();
         foreach (Node node in grid)
         {
             if(node.NodeInfo.tile != 0)
@@ -470,7 +475,6 @@ public class WFC : MonoBehaviour
 
         
         ReleaseBuffers();
-        sw.Stop();
         OnGridDone?.Invoke(sw.ElapsedMilliseconds / 1000f);
     }
 
@@ -567,12 +571,80 @@ public class WFC : MonoBehaviour
         // Gizmos.color = new (0, 1, 0, .85f);
         // Gizmos.DrawCube(new(0, 0), new(35, 35));
 
-        for (int i = 0; i < 4; i++)
-        {
-            float posI = -1.5f + i;
-            Gizmos.DrawLine(new(posI, -1.5f), new(posI, 1.5f));
-            Gizmos.DrawLine(new(-1.5f, posI), new(1.5f, posI));
-        }
+        
+        // Gizmos.color = new (1, 1, 1, .85f);
+        // Gizmos.DrawCube(new(-10, -10), new(15, 15));
+        // Gizmos.DrawCube(new(-10, 10), new(15, 15));
+        // Gizmos.DrawCube(new(10, -10), new(15, 15));
+        // Gizmos.DrawCube(new(10, 10), new(15, 15));
+        // Gizmos.color = new (1, 0, 0, .85f);
+        // Gizmos.DrawCube(Vector3.zero, new(35, 5));
+        // Gizmos.DrawCube(Vector3.zero, new(5, 35));
+        // Gizmos.DrawCube(new(0, 20f), new(35, 5));
+        // Gizmos.DrawCube(new(20f, 0), new(5, 35));
+        // Gizmos.DrawCube(new(20f, 20f), new(5, 5));
+        
+        // Gizmos.color = new (0, 1, 0, .85f);
+        // Gizmos.DrawCube(new(-10, -15), new(15, 5));
+        // Gizmos.DrawCube(new(-10, 5), new(15, 5));
+        // Gizmos.DrawCube(new(10, -15), new(15, 5));
+        // Gizmos.DrawCube(new(10, 5), new(15, 5));
+        // Gizmos.color = new (1, 1, 1, .85f);
+        // Gizmos.DrawCube(new(-10, -5), new(15, 15));
+        // Gizmos.DrawCube(new(-10, 15), new(15, 15));
+        // Gizmos.DrawCube(new(10, -5), new(15, 15));
+        // Gizmos.DrawCube(new(10, 15), new(15, 15));
+        // Gizmos.color = new (1, 0, 0, .85f);
+        // Gizmos.DrawCube(new(0, 2.5f), new(5, 40f));
+        // Gizmos.DrawCube(new(20, 2.5f), new(5, 40f));
+        
+        // Gizmos.color = new (0, 1, 0, .85f);
+        // Gizmos.DrawCube(new(-10, 2.5f), new(15, 40));
+        // Gizmos.DrawCube(new(10, 2.5f), new(15, 40));
+        // Gizmos.color = new (1, 1, 1, .85f);
+        // Gizmos.DrawCube(new(-5, -5), new(15, 15));
+        // Gizmos.DrawCube(new(-5, 15), new(15, 15));
+        // Gizmos.DrawCube(new(15, -5), new(15, 15));
+        // Gizmos.DrawCube(new(15, 15), new(15, 15));
+        // Gizmos.color = new (1, 0, 0, .85f);
+        // Gizmos.DrawCube(new(0, 5), new(5, 5));
+        // Gizmos.DrawCube(new(20, 5), new(5, 5));
+        // Gizmos.DrawCube(new(0, -15f), new(5, 5));
+        // Gizmos.DrawCube(new(20, -15f), new(5, 5));
+        
+        // Gizmos.color = new (0, 1, 0, .85f);
+        // Gizmos.DrawCube(new(2.5f, 20f), new(40, 5));
+        // Gizmos.DrawCube(new(-10, 0), new(15, 35));
+        // Gizmos.DrawCube(new(10, 0), new(15, 35));
+        // Gizmos.DrawCube(new(0, 15), new(5, 5));
+        // Gizmos.DrawCube(new(0, 0), new(5, 10));
+        // Gizmos.DrawCube(new(0, 6.25f), new(5, 2.5f));
+        // Gizmos.DrawCube(new(0, -6.25f), new(5, 2.5f));
+        // Gizmos.DrawCube(new(20, 0), new(5, 5));
+        // Gizmos.color = new (1, 1, 1, .85f);
+        // Gizmos.DrawCube(new(-5, -10), new(15, 15));
+        // Gizmos.DrawCube(new(-5, 10), new(15, 15));
+        // Gizmos.DrawCube(new(15, -10), new(15, 15));
+        // Gizmos.DrawCube(new(15, 10), new(15, 15));
+        
+        // Gizmos.color = new (0, 1, 0, .85f);
+        // Gizmos.DrawCube(new(2.5f, 2.5f), new(40, 40));
+
+        // Gizmos.color = Color.black;
+        // for (int i = 0; i < 9; i++)
+        // {
+        //     Gizmos.color = i == 4 ? Color.blue : Color. black;
+        //     float pos = -17.5f + 5 * i;
+        //     Gizmos.DrawLine(new(pos, -17.5f), new(pos, 22.5f));
+        //     Gizmos.DrawLine(new(-17.5f, pos), new(22.5f, pos));
+        // }
+
+        // for (int i = 0; i < 4; i++)
+        // {
+        //     float posI = -1.5f + i;
+        //     Gizmos.DrawLine(new(posI, -1.5f), new(posI, 1.5f));
+        //     Gizmos.DrawLine(new(-1.5f, posI), new(1.5f, posI));
+        // }
 
     }
 }

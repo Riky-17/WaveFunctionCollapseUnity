@@ -31,17 +31,13 @@ public class Node
 {
     public NodeInfo NodeInfo => nodeInfo;
     NodeInfo nodeInfo;
-    NodeInfo originalInfo;
     public Vector2 nodePos;
 
     public Node(Vector2 pos, NodeInfo nodeInfo)
     {
         nodePos = pos;
         this.nodeInfo = nodeInfo;
-        originalInfo = nodeInfo;
     }
-
-    public void Reset() => nodeInfo = originalInfo;
 
     public void UpdateInfo(NodeInfo nodeInfo) => this.nodeInfo = nodeInfo;
 }
